@@ -5,3 +5,4 @@ authors = ["yemi <zcyemi@gmail.com>"]
 edition = "2018"
 
 [dependencies]
+nom = "^4.2"
