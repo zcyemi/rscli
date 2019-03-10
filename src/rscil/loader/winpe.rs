@@ -1,27 +1,8 @@
 use nom::{IResult,HexDisplay,be_u8,le_u8,le_u16,le_u32};
 
-pub fn loader_test(){
-
-    test_dll();
-}
 
 
-
-pub fn test_dll(){
-
-    let data = include_bytes!("");
-    let d = win_pe(data);
-
-    match d {
-        Ok((i,dll))=>{
-            println!("ok");
-            println!("{:?}",dll);
-        },
-        _ =>{
-            println!("fail")
-        }
-    }
-}
+use crate::rscil::loader::util::DataInfo;
 
 #[derive(Debug)]
 pub struct DosHeader{}
@@ -40,7 +21,7 @@ pub struct WinPE<'a>{
     pub reloc_section: Section<'a>,
 }
 
-named!(win_pe<&[u8],WinPE>,do_parse!(
+named!(pub win_pe<&[u8],WinPE>,do_parse!(
     dos_header >>
     dos_stub >>
     coffheader: coff_header >>
@@ -149,11 +130,6 @@ named!(pe_nt_fields<&[u8],PeNtFields>,do_parse!(
     (PeNtFields{})
 ));
 
-#[derive(Debug)]
-pub struct DataInfo {
-    pub rva: rva,
-    pub size: u32,
-}
 
 #[derive(Debug)]
 pub struct DataDirectories{
