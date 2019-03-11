@@ -3,6 +3,7 @@ use nom::{IResult,HexDisplay,be_u8,le_u8,le_u16,le_u32};
 use crate::rscil::loader::util::DataInfo;
 use crate::rscil::loader::util::parse_datainfo;
 use crate::rscil::loader::util::parse_str_pad;
+use crate::rscil::loader::util::calculate_bits_vec;
 
 #[derive(Debug)]
 pub struct CLIData<'a>{
@@ -63,8 +64,8 @@ pub struct CLRMetadata<'a>{
     pub minor_version: u16,
     pub clr_ver_str:&'a str,
     pub num_of_stream: u16,
-
     pub stream_header: Vec<CLRStreamHeader<'a>>,
+    pub tilde_stream: CLRTildeStream,
 }
 
 named!(pub parse_clr_metadata<&[u8],CLRMetadata>,do_parse!(
@@ -78,12 +79,14 @@ named!(pub parse_clr_metadata<&[u8],CLRMetadata>,do_parse!(
     take!(2) >>
     num_of_stream: le_u16 >>
     headers: many_m_n!(num_of_stream as usize,num_of_stream as usize,parse_clr_stream_header) >>
+    tilde_stream: parse_tilde_stream >>
     (CLRMetadata{
         major_version:major_version,
         minor_version:minor_version,
         clr_ver_str:clr_ver_str,
         num_of_stream:num_of_stream,
         stream_header: headers,
+        tilde_stream:tilde_stream,
     })
 ));
 
@@ -106,4 +109,45 @@ named!(parse_clr_stream_header<&[u8],CLRStreamHeader>,do_parse!(
         name: name
     })
 ));
+
+#[derive(Debug)]
+pub struct CLRTildeStream{
+    pub major_ver: u8,
+    pub minor_ver: u8,
+    pub heap_size: u8,
+    pub valid:Vec<u8>,
+    pub sorted:Vec<u8>,
+    pub rows: Vec<u32>,
+}
+
+impl CLRTildeStream{
+
+}
+
+fn xx(){
+    let x = vec![1,2,34,5];
+}
+
+named!(pub parse_tilde_stream<&[u8],CLRTildeStream>,do_parse!(
+    take!(4) >>
+    major_ver: le_u8 >>
+    minor_ver: le_u8 >>
+    heap_size: le_u8 >>
+    tag!(&[0x01]) >>
+    valid: count!(le_u8,8)>>
+    sorted: count!(le_u8,8) >>
+    rows: count!(le_u32,calculate_bits_vec(&valid) as usize) >>
+    (
+        CLRTildeStream{
+            major_ver:major_ver,
+            minor_ver: minor_ver,
+            heap_size: heap_size,
+            valid: valid,
+            sorted: sorted,
+            rows:rows,
+        }
+    )
+));
+
+
 
