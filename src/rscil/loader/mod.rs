@@ -40,7 +40,7 @@ impl<'a> DllFile<'a>{
 
 
 pub fn loader_test(){
-    
+
     let data = include_bytes!("E:/netdlltest.dll");
 
     let dll = DllFile::load(data).unwrap();
