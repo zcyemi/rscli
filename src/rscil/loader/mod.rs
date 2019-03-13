@@ -24,7 +24,7 @@ pub struct DllFile<'a>{
 }
 
 pub fn loader_test(){
-    
+
     let data = include_bytes!("E:/netdlltest.dll");
     let d = parser_dll(data);
 

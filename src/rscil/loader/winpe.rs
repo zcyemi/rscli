@@ -1,6 +1,6 @@
 use nom::{IResult,HexDisplay,be_u8,le_u8,le_u16,le_u32};
 
-
+use std::option::Option;
 
 use crate::rscil::loader::util::DataInfo;
 
@@ -21,7 +21,20 @@ pub struct WinPE<'a>{
     pub reloc_section: Section<'a>,
 }
 
-named!(pub win_pe<&[u8],WinPE>,do_parse!(
+impl WinPE{
+    pub fn parse(i:&[u8])->Option<(&[u8],WinPE)>{
+        let ret = match parse_win_pe(i) {
+            Some(v)=>{v},
+            Err(e)=>{
+                println!("{}",e);
+                Option::None
+            }
+        };
+        ret
+    }
+}
+
+named!(pub parse_win_pe<&[u8],WinPE>,do_parse!(
     dos_header >>
     dos_stub >>
     coffheader: coff_header >>
@@ -31,6 +44,7 @@ named!(pub win_pe<&[u8],WinPE>,do_parse!(
     text_section: parse_section >>
     rsrc_section: parse_section >>
     reloc_section: parse_section >>
+    take!(16) >>
     (WinPE{
         coff_header: coffheader,
         coff_fields: coff_fields,

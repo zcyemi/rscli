@@ -1,9 +1,13 @@
 use nom::{IResult,HexDisplay,be_u8,le_u8,le_u16,le_u32};
 
+use std::option::Option;
+
 use crate::rscil::loader::util::DataInfo;
 use crate::rscil::loader::util::parse_datainfo;
 use crate::rscil::loader::util::parse_str_pad;
 use crate::rscil::loader::util::calculate_bits_vec;
+
+use crate::rscil::loader::winpe::{win_pe,WinPE};
 
 #[derive(Debug)]
 pub struct CLIData<'a>{
@@ -11,6 +15,15 @@ pub struct CLIData<'a>{
     pub metadata:CLRMetadata<'a>,
 
 }
+
+impl CLIData{
+
+
+    pub fn parse(i:&[u8])-> Option<(&[u8],CLIData)>{
+
+    }
+}
+
 
 // total bytes 8 + 72
 named!(pub parse_clidata<&[u8],CLIData>,do_parse!(
@@ -31,6 +44,11 @@ pub struct CLIHeader{
     pub flags: u32,
     pub entry_point_token: u32,
     pub strong_name_signature: DataInfo,
+}
+
+impl CLIHeader{
+
+
 }
 
 // total bytes 8 + 72
@@ -120,14 +138,6 @@ pub struct CLRTildeStream{
     pub rows: Vec<u32>,
 }
 
-impl CLRTildeStream{
-
-}
-
-fn xx(){
-    let x = vec![1,2,34,5];
-}
-
 named!(pub parse_tilde_stream<&[u8],CLRTildeStream>,do_parse!(
     take!(4) >>
     major_ver: le_u8 >>
@@ -150,4 +160,67 @@ named!(pub parse_tilde_stream<&[u8],CLRTildeStream>,do_parse!(
 ));
 
 
+//pub struct CLRAssemblyTable<'a>{
+//    pub data_bulk: &'a [u8],
+//    pub assembly: Vec<CLRMetaAssembly>,
+//}
 
+//impl CLRAssemblyTable{
+//
+//}
+
+//pub fn parse_clr_meta_assembly(i:&[u8])-> IResult<&[u8],u8>{
+//    do_parse!()
+//}
+
+pub struct  CLRMetaAssembly{
+//    pub hash_alg_id: u32,
+//    pub major_version: u16,
+//    pub minor_version:u16,
+//    pub build_number:u16,
+//    pub revision_number:u16,
+//    pub flags:u32,
+//    pub name:u32,
+//    pub culture:u32,
+}
+
+
+
+#[derive(Debug)]
+pub struct CLRDll{
+
+}
+
+
+
+
+impl CLRDll{
+
+    pub fn load(data:&[u8])->Option<CLRDll>{
+
+        Option::None
+    }
+
+
+    named!(parser_dll<&[u8],DllFile>,do_parse!(
+    pe: win_pe >>
+    take!(16) >>
+    clidata: parse_clidata >>
+    (DllFile{
+        pe:pe,
+        cli:clidata,
+    })
+    ));
+
+
+    fn parse_data(d:&[u8])-> Option<CLRDll>{
+
+
+        let xx = parser_dll(d);
+
+
+
+
+        Option::None
+    }
+}
