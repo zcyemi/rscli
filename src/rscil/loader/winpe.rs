@@ -44,7 +44,7 @@ impl<'a> WinPE<'a>{
     named!(parse_dos_stub<&[u8],()>,do_parse!(take!(64) >>()));
 }
 
-type rva = u32;
+type RVA = u32;
 
 #[derive(Debug)]
 pub struct CoffHeader{
@@ -87,9 +87,9 @@ pub struct CoffFields{
     pub size_code: u32,
     pub size_initialized_data:u32,
     pub size_uninitialized_data:u32,
-    pub addr_entry_point: rva,
-    pub base_of_code: rva,
-    pub base_of_data: rva,
+    pub addr_entry_point: RVA,
+    pub base_of_code: RVA,
+    pub base_of_data: RVA,
 }
 
 impl CoffFields{
@@ -137,7 +137,7 @@ pub struct DataDirectories{
     pub base_relocation_tbl: DataInfo,
     pub debug: DataInfo,
     pub architecture_data: DataInfo,
-    pub global_ptr: rva,
+    pub global_ptr: RVA,
     pub tls_tbl: DataInfo,
     pub load_config_tbl:DataInfo,
     pub bound_import: DataInfo,
@@ -189,7 +189,7 @@ impl DataDirectories{
 pub struct Section<'a>{
     pub name: &'a str,
     pub virtual_size:u32,
-    pub virtual_addr:rva,
+    pub virtual_addr: RVA,
     pub size_of_raw_data: u32,
     pub pointer_to_raw_data:u32,
     pub pointer_to_relocations:u32,
