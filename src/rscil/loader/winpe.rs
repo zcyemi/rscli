@@ -1,14 +1,5 @@
 use nom::{IResult,HexDisplay,be_u8,le_u8,le_u16,le_u32};
-
-
-
 use crate::rscil::loader::util::DataInfo;
-
-#[derive(Debug)]
-pub struct DosHeader{}
-
-#[derive(Debug)]
-pub struct DosStub{}
 
 #[derive(Debug)]
 pub struct WinPE<'a>{
@@ -21,36 +12,37 @@ pub struct WinPE<'a>{
     pub reloc_section: Section<'a>,
 }
 
-named!(pub win_pe<&[u8],WinPE>,do_parse!(
-    dos_header >>
-    dos_stub >>
-    coffheader: coff_header >>
-    coff_fields:coff_fields >>
-    pe_nt_fields: pe_nt_fields >>
-    data_directories: data_directories >>
-    text_section: parse_section >>
-    rsrc_section: parse_section >>
-    reloc_section: parse_section >>
-    (WinPE{
-        coff_header: coffheader,
-        coff_fields: coff_fields,
-        nt_fields: pe_nt_fields,
-        data_directories: data_directories,
-        text_section: text_section,
-        rsrc_section: rsrc_section,
-        reloc_section: reloc_section,
-    })
-));
+impl<'a> WinPE<'a>{
+    named!(pub parse<&[u8],WinPE>,do_parse!(
+        call!(WinPE::parse_dos_header) >>
+        call!(WinPE::parse_dos_stub) >>
+        coffheader: call!(CoffHeader::parse) >>
+        coff_fields:call!(CoffFields::parse) >>
+        pe_nt_fields: call!(PeNtFields::parse) >>
+        data_directories: call!(DataDirectories::parse) >>
+        text_section: call!(Section::parse) >>
+        rsrc_section: call!(Section::parse) >>
+        reloc_section: call!(Section::parse) >>
+        (WinPE{
+            coff_header: coffheader,
+            coff_fields: coff_fields,
+            nt_fields: pe_nt_fields,
+            data_directories: data_directories,
+            text_section: text_section,
+            rsrc_section: rsrc_section,
+            reloc_section: reloc_section,
+        })
+    ));
 
-named!(dos_header<&[u8],DosHeader>,
-    do_parse!(
-        tag!(&[0x4D,0x5A]) >>
-        take!(62) >>
-    (DosHeader{})
-));
+    named!(parse_dos_header<&[u8],()>,
+        do_parse!(
+            tag!(&[0x4D,0x5A]) >>
+            take!(62) >>
+        (())
+    ));
 
-named!(dos_stub<&[u8],DosStub>,do_parse!(take!(64) >>(DosStub{})));
-
+    named!(parse_dos_stub<&[u8],()>,do_parse!(take!(64) >>()));
+}
 
 type rva = u32;
 
@@ -65,25 +57,28 @@ pub struct CoffHeader{
     pub characteristics:u16,
 }
 
-named!(coff_header<&[u8],CoffHeader>,do_parse!(
-    tag!([0x50,0x45,0,0]) >>
-    machine: le_u16 >>
-    num_section: le_u16 >>
-    timedate_stamp: le_u32 >>
-    pointer_sbl_tbl: le_u32 >>
-    num_sbl_tbl: le_u32 >>
-    sz_opt_header: le_u16 >>
-    characteristics: le_u16 >>
-    (CoffHeader{
-        machine: machine,
-        num_section:num_section,
-        timedate_stamp: timedate_stamp,
-        pointer_sbl_tbl:pointer_sbl_tbl,
-        num_sbl_tbl:num_sbl_tbl,
-        sz_opt_header:sz_opt_header,
-        characteristics
-    })
-));
+impl CoffHeader{
+    named!(parse<&[u8],CoffHeader>,do_parse!(
+        tag!([0x50,0x45,0,0]) >>
+        machine: le_u16 >>
+        num_section: le_u16 >>
+        timedate_stamp: le_u32 >>
+        pointer_sbl_tbl: le_u32 >>
+        num_sbl_tbl: le_u32 >>
+        sz_opt_header: le_u16 >>
+        characteristics: le_u16 >>
+        (CoffHeader{
+            machine: machine,
+            num_section:num_section,
+            timedate_stamp: timedate_stamp,
+            pointer_sbl_tbl:pointer_sbl_tbl,
+            num_sbl_tbl:num_sbl_tbl,
+            sz_opt_header:sz_opt_header,
+            characteristics
+        })
+    ));
+}
+
 
 #[derive(Debug)]
 pub struct CoffFields{
@@ -97,39 +92,40 @@ pub struct CoffFields{
     pub base_of_data: rva,
 }
 
-named!(coff_fields<&[u8],CoffFields>,do_parse!(
-    tag!([0x0B,0x01]) >>
-    maj_linker_ver: le_u8 >>
-    min_linker_ver: le_u8 >>
-    size_code: le_u32 >>
-    size_initialized_data:le_u32 >>
-    size_uninitialized_data:le_u32 >>
-    addr_entry_point:le_u32 >>
-    base_of_code: le_u32 >>
-    base_of_data: le_u32 >>
-    (CoffFields{
-        maj_linker_ver:maj_linker_ver,
-        min_linker_ver: min_linker_ver,
-        size_code:size_code,
-        size_initialized_data:size_initialized_data,
-        size_uninitialized_data:size_uninitialized_data,
-        addr_entry_point:addr_entry_point,
-        base_of_code:base_of_code,
-        base_of_data:base_of_data,
-    })
-));
-
+impl CoffFields{
+    named!(parse<&[u8],CoffFields>,do_parse!(
+        tag!([0x0B,0x01]) >>
+        maj_linker_ver: le_u8 >>
+        min_linker_ver: le_u8 >>
+        size_code: le_u32 >>
+        size_initialized_data:le_u32 >>
+        size_uninitialized_data:le_u32 >>
+        addr_entry_point:le_u32 >>
+        base_of_code: le_u32 >>
+        base_of_data: le_u32 >>
+        (CoffFields{
+            maj_linker_ver:maj_linker_ver,
+            min_linker_ver: min_linker_ver,
+            size_code:size_code,
+            size_initialized_data:size_initialized_data,
+            size_uninitialized_data:size_uninitialized_data,
+            addr_entry_point:addr_entry_point,
+            base_of_code:base_of_code,
+            base_of_data:base_of_data,
+        })
+    ));
+}
 
 #[derive(Debug)]
 pub struct PeNtFields{
-    //Total size 68 byte
 }
 
-named!(pe_nt_fields<&[u8],PeNtFields>,do_parse!(
-    take!(68) >>
-    (PeNtFields{})
-));
-
+impl PeNtFields{
+    named!(parse<&[u8],PeNtFields>,do_parse!(
+        take!(68) >>
+        (PeNtFields{})
+    ));
+}
 
 #[derive(Debug)]
 pub struct DataDirectories{
@@ -150,48 +146,44 @@ pub struct DataDirectories{
     pub clr_runtime_helper: DataInfo,
 }
 
-named!(parse_datainfo<&[u8],DataInfo>,do_parse!(
-    rva: le_u32 >>
-    size: le_u32 >>
-    (DataInfo{rva:rva,size:size})
-));
-
-named!(data_directories<&[u8],DataDirectories>,do_parse!(
-    export_tbl: parse_datainfo >>
-    import_tbl: parse_datainfo >>
-    resource_tbl: parse_datainfo >>
-    exception_tbl: parse_datainfo >>
-    certificate_tbl: parse_datainfo >>
-    base_relocation_tbl: parse_datainfo >>
-    debug: parse_datainfo >>
-    architecture_data: parse_datainfo >>
-    global_ptr: le_u32 >>
-    take!(4) >>
-    tls_tbl: parse_datainfo >>
-    load_config_tbl: parse_datainfo >>
-    bound_import: parse_datainfo >>
-    import_addr_tbl: parse_datainfo >>
-    delay_import_descriptor: parse_datainfo >>
-    clr_runtime_helper: parse_datainfo >>
-    take!(8) >>
-    (DataDirectories{
-        export_tbl:export_tbl,
-        import_tbl:import_tbl,
-        resource_tbl:resource_tbl,
-        exception_tbl:exception_tbl,
-        certificate_tbl:certificate_tbl,
-        base_relocation_tbl:base_relocation_tbl,
-        debug:debug,
-        architecture_data:architecture_data,
-        global_ptr:global_ptr,
-        tls_tbl:tls_tbl,
-        load_config_tbl: load_config_tbl,
-        bound_import: bound_import,
-        import_addr_tbl: import_addr_tbl,
-        delay_import_descriptor: delay_import_descriptor,
-        clr_runtime_helper: clr_runtime_helper,
-    })
-));
+impl DataDirectories{
+    named!(parse<&[u8],DataDirectories>,do_parse!(
+        export_tbl: call!(DataInfo::parse) >>
+        import_tbl: call!(DataInfo::parse) >>
+        resource_tbl: call!(DataInfo::parse) >>
+        exception_tbl: call!(DataInfo::parse) >>
+        certificate_tbl: call!(DataInfo::parse) >>
+        base_relocation_tbl: call!(DataInfo::parse) >>
+        debug: call!(DataInfo::parse) >>
+        architecture_data: call!(DataInfo::parse) >>
+        global_ptr: le_u32 >>
+        take!(4) >>
+        tls_tbl: call!(DataInfo::parse) >>
+        load_config_tbl: call!(DataInfo::parse) >>
+        bound_import: call!(DataInfo::parse) >>
+        import_addr_tbl: call!(DataInfo::parse) >>
+        delay_import_descriptor: call!(DataInfo::parse) >>
+        clr_runtime_helper: call!(DataInfo::parse) >>
+        take!(8) >>
+        (DataDirectories{
+            export_tbl:export_tbl,
+            import_tbl:import_tbl,
+            resource_tbl:resource_tbl,
+            exception_tbl:exception_tbl,
+            certificate_tbl:certificate_tbl,
+            base_relocation_tbl:base_relocation_tbl,
+            debug:debug,
+            architecture_data:architecture_data,
+            global_ptr:global_ptr,
+            tls_tbl:tls_tbl,
+            load_config_tbl: load_config_tbl,
+            bound_import: bound_import,
+            import_addr_tbl: import_addr_tbl,
+            delay_import_descriptor: delay_import_descriptor,
+            clr_runtime_helper: clr_runtime_helper,
+        })
+    ));
+}
 
 #[derive(Debug)]
 pub struct Section<'a>{
@@ -207,27 +199,29 @@ pub struct Section<'a>{
     pub characteristics:u32,
 }
 
-named!(parse_section<&[u8],Section>,do_parse!(
-    name: take_str!(8) >>
-    virtual_size: le_u32 >>
-    virtual_addr: le_u32 >>
-    size_of_raw_data: le_u32 >>
-    pointer_to_raw_data: le_u32 >>
-    pointer_to_relocations: le_u32 >>
-    pointer_to_linenumbers: le_u32 >>
-    num_of_relocations: le_u16 >>
-    num_of_linenumbers: le_u16 >>
-    characteristics: le_u32 >>
-    (Section{
-        name: name,
-        virtual_size: virtual_size,
-        virtual_addr: virtual_addr,
-        size_of_raw_data: size_of_raw_data,
-        pointer_to_raw_data: pointer_to_raw_data,
-        pointer_to_relocations: pointer_to_relocations,
-        pointer_to_linenumbers: pointer_to_linenumbers,
-        num_of_relocations: num_of_relocations,
-        num_of_linenumbers: num_of_linenumbers,
-        characteristics: characteristics
-    })
-));
+impl<'a> Section<'a>{
+    named!(parse<&[u8],Section>,do_parse!(
+        name: take_str!(8) >>
+        virtual_size: le_u32 >>
+        virtual_addr: le_u32 >>
+        size_of_raw_data: le_u32 >>
+        pointer_to_raw_data: le_u32 >>
+        pointer_to_relocations: le_u32 >>
+        pointer_to_linenumbers: le_u32 >>
+        num_of_relocations: le_u16 >>
+        num_of_linenumbers: le_u16 >>
+        characteristics: le_u32 >>
+        (Section{
+            name: name,
+            virtual_size: virtual_size,
+            virtual_addr: virtual_addr,
+            size_of_raw_data: size_of_raw_data,
+            pointer_to_raw_data: pointer_to_raw_data,
+            pointer_to_relocations: pointer_to_relocations,
+            pointer_to_linenumbers: pointer_to_linenumbers,
+            num_of_relocations: num_of_relocations,
+            num_of_linenumbers: num_of_linenumbers,
+            characteristics: characteristics
+        })
+    ));
+}

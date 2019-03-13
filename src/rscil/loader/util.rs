@@ -2,21 +2,21 @@ use nom::{IResult,HexDisplay,be_u8,le_u8,le_u16,le_u32};
 
 use std::str;
 
-pub type rva = u32;
+pub type RVA = u32;
 
 #[derive(Debug)]
 pub struct DataInfo {
-    pub rva: rva,
+    pub rva: RVA,
     pub size: u32,
 }
 
-
-named!(pub parse_datainfo<&[u8],DataInfo>,do_parse!(
-    rva: le_u32 >>
-    size: le_u32 >>
-    (DataInfo{rva:rva,size:size})
-));
-
+impl DataInfo{
+    named!(pub parse<&[u8],DataInfo>,do_parse!(
+        rva: le_u32 >>
+        size: le_u32 >>
+        (DataInfo{rva:rva,size:size})
+    ));
+}
 
 named!(pub parse_str_pad<&[u8],&str>,do_parse!(
     str: take_till!(|ch| ch == 0_u8) >>
