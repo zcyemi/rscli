@@ -1,4 +1,4 @@
-use nom::{IResult,HexDisplay,be_u8,le_u8,le_u16,le_u32};
+use nom::{IResult,HexDisplay,be_u8,le_u8,le_u16,le_u32,ErrorKind};
 
 use std::str;
 
@@ -42,4 +42,20 @@ pub fn calculate_bits_vec(v:&Vec<u8>)->u8{
         c += calculate_bits_1(i);
     };
     c
+}
+
+pub fn resolve_result<'a,T>(suc:&mut bool,result:IResult<&'a [u8],T>)->Option<(&'a [u8],T)>{
+
+    let ret= match result {
+        Ok(v)=>{Some(v)},
+        Err(e)=>{
+            Option::None
+        }
+    };
+    *suc = ret.is_some();
+    ret
+}
+
+pub fn return_err<'a,T>(i:&'a [u8],code:u32)->IResult<&'a [u8],T>{
+    Result::Err(nom::Err::Failure(nom::Context::Code(i,ErrorKind::Custom(0))))
 }

@@ -3,6 +3,8 @@ use nom::{IResult,HexDisplay,be_u8,le_u8,le_u16,le_u32};
 use crate::rscil::loader::util::DataInfo;
 use crate::rscil::loader::util::parse_str_pad;
 use crate::rscil::loader::util::calculate_bits_vec;
+use crate::rscil::loader::util::resolve_result;
+use crate::rscil::loader::util::return_err;
 
 #[derive(Debug)]
 pub struct CLIData<'a>{
@@ -23,7 +25,6 @@ impl<'a> CLIData<'a>{
         })
     ));
 }
-
 
 #[derive(Debug)]
 pub struct CLIHeader{
@@ -84,7 +85,7 @@ impl<'a> CLIMetadata<'a>{
         take!(2) >>
         num_of_stream: le_u16 >>
         headers: many_m_n!(num_of_stream as usize,num_of_stream as usize,call!(CLIStreamHeader::parse)) >>
-        tilde_stream: parse_tilde_stream >>
+        tilde_stream: call!(CLITildeStream::parse) >>
         (CLIMetadata{
             major_version:major_version,
             minor_version:minor_version,
@@ -118,7 +119,6 @@ impl<'a> CLIStreamHeader<'a>{
     ));
 }
 
-
 #[derive(Debug)]
 pub struct CLITildeStream{
     pub major_ver: u8,
@@ -129,30 +129,49 @@ pub struct CLITildeStream{
     pub rows: Vec<u32>,
 }
 
+
 impl CLITildeStream{
 
-}
+    pub fn parse(input:&[u8])->IResult<&[u8],CLITildeStream>{
+        type DataPartial = (u8,u8,u8,Vec<u8>,Vec<u8>);
+        let ret:IResult<&[u8],DataPartial> = do_parse!(input,
+            take!(4) >>
+            major_ver: le_u8 >>
+            minor_ver: le_u8 >>
+            heap_size: le_u8 >>
+            tag!(&[0x01]) >>
+            valid: count!(le_u8,8)>>
+            sorted: count!(le_u8,8) >>
+            (major_ver,minor_ver,heap_size,valid,sorted));
 
-named!(pub parse_tilde_stream<&[u8],CLITildeStream>,do_parse!(
-    take!(4) >>
-    major_ver: le_u8 >>
-    minor_ver: le_u8 >>
-    heap_size: le_u8 >>
-    tag!(&[0x01]) >>
-    valid: count!(le_u8,8)>>
-    sorted: count!(le_u8,8) >>
-    rows: count!(le_u32,calculate_bits_vec(&valid) as usize) >>
-    (
-        CLITildeStream{
-            major_ver:major_ver,
-            minor_ver: minor_ver,
-            heap_size: heap_size,
-            valid: valid,
-            sorted: sorted,
-            rows:rows,
+        if ret.is_err() {
+            return_err(ret.unwrap().0,0)
+        }else{
+            let (i,o) = ret.unwrap();
+            let (major_ver,minor_ver,heap_size,valid,sorted) = o;
+            let tblcount = calculate_bits_vec(&valid) as usize;
+
+            let mut suc = false;
+
+            let ret = resolve_result(&mut suc,count!(i,le_u32,tblcount));
+            if !suc {
+                return_err(ret.unwrap().0,10)
+            }else{
+                let rows = ret.unwrap();
+
+                let r = rows.1;
+
+                let stream = CLITildeStream{
+                    major_ver,
+                    minor_ver,
+                    heap_size,
+                    valid,
+                    sorted,
+                    rows:r,
+                };
+                Result::Ok((rows.0,stream))
+            }
         }
-    )
-));
-
-
+    }
+}
 
