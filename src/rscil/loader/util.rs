@@ -36,6 +36,17 @@ pub fn calculate_bits_1(v:u8)->u8{
     c
 }
 
+pub fn calculate_bits_u64(v:u64)->u8{
+    let mut x =v;
+    let mut c:u8 = 0;
+    while x > 0 {
+        x &= x-1;
+        c = c+1;
+    };
+    c
+}
+
+
 pub fn calculate_bits_vec(v:&Vec<u8>)->u8{
     let mut c = 0;
     for &i in v.iter() {

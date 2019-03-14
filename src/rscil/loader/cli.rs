@@ -1,19 +1,22 @@
-use nom::{IResult,HexDisplay,be_u8,le_u8,le_u16,le_u32};
+use nom::{IResult, HexDisplay, be_u8, le_u8, le_u16, le_u32, le_u64};
 
 use crate::rscil::loader::util::DataInfo;
 use crate::rscil::loader::util::parse_str_pad;
-use crate::rscil::loader::util::calculate_bits_vec;
+use crate::rscil::loader::util::calculate_bits_u64;
 use crate::rscil::loader::util::resolve_result;
 use crate::rscil::loader::util::return_err;
 
+use std::slice::Iter;
+use std::cmp::Ordering;
+
 #[derive(Debug)]
-pub struct CLIData<'a>{
+pub struct CLIData<'a> {
     pub header: CLIHeader,
-    pub metadata:CLIMetadata<'a>,
+    pub metadata: CLIMetadata<'a>,
 
 }
 
-impl<'a> CLIData<'a>{
+impl<'a> CLIData<'a> {
     // total bytes 8 + 72
     named!(pub parse<&[u8],CLIData>,do_parse!(
         take!(8) >>
@@ -27,7 +30,7 @@ impl<'a> CLIData<'a>{
 }
 
 #[derive(Debug)]
-pub struct CLIHeader{
+pub struct CLIHeader {
     pub major_runtime_ver: u16,
     pub minor_runtime_ver: u16,
     pub metadata: DataInfo,
@@ -36,7 +39,7 @@ pub struct CLIHeader{
     pub strong_name_signature: DataInfo,
 }
 
-impl CLIHeader{
+impl CLIHeader {
     // total bytes 8 + 72
     named!(pub parse<&[u8],CLIHeader>,do_parse!(
         tag!(&[0x48,0,0,0]) >>
@@ -63,17 +66,16 @@ impl CLIHeader{
 }
 
 #[derive(Debug)]
-pub struct CLIMetadata<'a>{
+pub struct CLIMetadata<'a> {
     pub major_version: u16,
     pub minor_version: u16,
-    pub cli_ver_str:&'a str,
+    pub cli_ver_str: &'a str,
     pub num_of_stream: u16,
     pub stream_header: Vec<CLIStreamHeader<'a>>,
     pub tilde_stream: CLITildeStream,
 }
 
-impl<'a> CLIMetadata<'a>{
-
+impl<'a> CLIMetadata<'a> {
     named!(pub parse<&[u8],CLIMetadata>,do_parse!(
         take_until!(&[0x42,0x53,0x4A,0x42][..]) >>
         tag!(&[0x42,0x53,0x4A,0x42]) >>
@@ -99,14 +101,13 @@ impl<'a> CLIMetadata<'a>{
 
 
 #[derive(Debug)]
-pub struct CLIStreamHeader<'a>{
+pub struct CLIStreamHeader<'a> {
     pub offset: u32,
     pub size: u32,
-    pub name:&'a str,
+    pub name: &'a str,
 }
 
-impl<'a> CLIStreamHeader<'a>{
-
+impl<'a> CLIStreamHeader<'a> {
     named!(parse<&[u8],CLIStreamHeader>,do_parse!(
         offset: le_u32 >>
         size: le_u32 >>
@@ -120,58 +121,202 @@ impl<'a> CLIStreamHeader<'a>{
 }
 
 #[derive(Debug)]
-pub struct CLITildeStream{
+pub struct CLITildeStream {
     pub major_ver: u8,
     pub minor_ver: u8,
     pub heap_size: u8,
-    pub valid:Vec<u8>,
-    pub sorted:Vec<u8>,
+    pub valid: u64,
+    pub sorted: u64,
     pub rows: Vec<u32>,
+
+    pub table_module: Option<ModuleTbl>,
 }
 
 
-impl CLITildeStream{
+impl CLITildeStream {
+    pub fn default() -> CLITildeStream {
+        CLITildeStream {
+            major_ver: 0,
+            minor_ver: 0,
+            heap_size: 0,
+            valid: 0,
+            sorted: 0,
+            rows: vec![],
+            table_module: Option::None,
+        }
+    }
 
-    pub fn parse(input:&[u8])->IResult<&[u8],CLITildeStream>{
-        type DataPartial = (u8,u8,u8,Vec<u8>,Vec<u8>);
-        let ret:IResult<&[u8],DataPartial> = do_parse!(input,
+    pub fn parse(input: &[u8]) -> IResult<&[u8], CLITildeStream> {
+        let mut tildestream = CLITildeStream::default();
+
+        type DataPartial = (u8, u8, u8, u64, u64);
+        let ret: IResult<&[u8], DataPartial> = do_parse!(input,
             take!(4) >>
             major_ver: le_u8 >>
             minor_ver: le_u8 >>
             heap_size: le_u8 >>
             tag!(&[0x01]) >>
-            valid: count!(le_u8,8)>>
-            sorted: count!(le_u8,8) >>
+            valid: le_u64>>
+            sorted: le_u64 >>
             (major_ver,minor_ver,heap_size,valid,sorted));
 
         if ret.is_err() {
-            return_err(ret.unwrap().0,0)
-        }else{
-            let (i,o) = ret.unwrap();
-            let (major_ver,minor_ver,heap_size,valid,sorted) = o;
-            let tblcount = calculate_bits_vec(&valid) as usize;
+            return_err(ret.unwrap().0, 0)
+        } else {
+            let (i, o) = ret.unwrap();
+
+            tildestream.major_ver = o.0;
+            tildestream.minor_ver = o.1;
+            tildestream.heap_size = o.2;
+            tildestream.valid = o.3;
+            tildestream.sorted = o.4;
+
+            let (major_ver, minor_ver, heap_size, valid, sorted) = o;
+            let tblcount = calculate_bits_u64(valid) as usize;
+
+            println!("table count:{}", tblcount);
 
             let mut suc = false;
 
-            let ret = resolve_result(&mut suc,count!(i,le_u32,tblcount));
+            let ret = resolve_result(&mut suc, count!(i,le_u32,tblcount));
             if !suc {
-                return_err(ret.unwrap().0,10)
-            }else{
+                return_err(ret.unwrap().0, 10)
+            } else {
                 let rows = ret.unwrap();
 
-                let r = rows.1;
+                tildestream.rows = rows.1;
+                tildestream.parse_table();
+                Result::Ok((rows.0, tildestream))
+            }
+        }
+    }
 
-                let stream = CLITildeStream{
-                    major_ver,
-                    minor_ver,
-                    heap_size,
-                    valid,
-                    sorted,
-                    rows:r,
-                };
-                Result::Ok((rows.0,stream))
+    fn parse_table(self: &Self) {
+        let valid = &self.valid;
+        println!("{:#b}", *valid);
+
+        let mut tbls = TableId::map();
+        tbls.sort();
+
+        let tbl_iter = tbls.iter();
+
+        for &iter in tbl_iter {
+            if TableId::is_table_valid(&self.valid, &iter) {
+                println!("has table {:?}", iter);
             }
         }
     }
 }
+
+#[derive(Debug, Copy, Clone,Eq)]
+pub enum TableId {
+    Assembly = 0x20,
+    AssemblyOS = 0x22,
+    AssemblyProcessor = 0x21,
+    AssemblyRef = 0x23,
+    AssemblyRefOS = 0x25,
+    AssemblyRefProcessor = 0x24,
+    ClassLayout = 0x0F,
+    Constant = 0x0B,
+    CustomAttribute = 0x0C,
+    DeclSecurity = 0x0E,
+    EventMap = 0x12,
+    ExportedType = 0x27,
+    Field = 0x04,
+    FieldLayout = 0x10,
+    FieldMarshal = 0x0D,
+    File = 0x26,
+    GenericParam = 0x1D,
+    GenericParamConstraint = 0x2C,
+    ImplMap = 0x1C,
+    ManifestResource = 0x28,
+    MemberRef = 0x0A,
+    MethodDef = 0x06,
+    MethodImpl = 0x19,
+    MethodSemantics = 0x18,
+    MethodSpec = 0x2B,
+    Module = 0x00,
+    ModuleRef = 0x1A,
+    NestedClass = 0x29,
+    Param = 0x08,
+    Property = 0x17,
+    PropertyMap = 0x15,
+    StandAloneSig = 0x11,
+    TypeDef = 0x02,
+    TypeRef = 0x01,
+    TypeSpec = 0x1B,
+}
+
+impl Ord for TableId{
+
+    fn cmp(&self, other: &TableId) -> Ordering {
+        (*self as u8) .cmp(&(*other as u8))
+    }
+}
+
+impl PartialOrd for TableId {
+    fn partial_cmp(&self, other: &TableId) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for TableId {
+    fn eq(&self, other: &TableId) -> bool {
+        (*self as u8) == (*other as u8)
+    }
+}
+
+impl TableId {
+    pub fn is_table_valid(valid: &u64, id: &TableId) -> bool {
+        valid & (1 << (*id as u64)) > 0
+    }
+
+    pub fn map()->[TableId;36]{
+        static TABLES: [TableId; 36] =[
+            TableId::EventMap,
+            TableId::Assembly,
+            TableId::AssemblyOS,
+            TableId::AssemblyProcessor,
+            TableId::AssemblyRef,
+            TableId::AssemblyRefOS,
+            TableId::AssemblyRefProcessor,
+            TableId::ClassLayout,
+            TableId::Constant,
+            TableId::CustomAttribute,
+            TableId::DeclSecurity,
+            TableId::EventMap,
+            TableId::ExportedType,
+            TableId::Field,
+            TableId::FieldLayout,
+            TableId::FieldMarshal,
+            TableId::File,
+            TableId::GenericParam,
+            TableId::GenericParamConstraint,
+            TableId::ImplMap,
+            TableId::ManifestResource,
+            TableId::MemberRef,
+            TableId::MethodDef,
+            TableId::MethodImpl,
+            TableId::MethodSemantics,
+            TableId::MethodSpec,
+            TableId::Module,
+            TableId::ModuleRef,
+            TableId::NestedClass,
+            TableId::Param,
+            TableId::Property,
+            TableId::PropertyMap,
+            TableId::StandAloneSig,
+            TableId::TypeDef,
+            TableId::TypeRef,
+            TableId::TypeSpec,
+        ];
+        TABLES
+    }
+}
+
+#[derive(Debug)]
+pub struct ModuleTbl {
+    pub  row: u32,
+}
+
 
