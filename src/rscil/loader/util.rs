@@ -1,4 +1,4 @@
-use nom::{IResult,HexDisplay,be_u8,le_u8,le_u16,le_u32,ErrorKind};
+use nom::{IResult,HexDisplay,be_u8,le_u8,le_u16,le_u32,ErrorKind,need_more,Needed};
 
 use std::str;
 
@@ -25,6 +25,28 @@ named!(pub parse_str_pad<&[u8],&str>,do_parse!(
         str::from_utf8(str).unwrap()
     )
 ));
+
+
+#[inline]
+pub fn parse_id(i: &[u8],byte4:bool) -> IResult<&[u8], u32> {
+    if byte4 {
+        if i.len() < 4 {
+            need_more(i, Needed::Size(4))
+        } else {
+            let res = ((i[3] as u32) << 24) + ((i[2] as u32) << 16) + ((i[1] as u32) << 8) + i[0] as u32;
+            Ok((&i[4..], res))
+        }
+    }
+    else{
+        if i.len() < 2 {
+            need_more(i, Needed::Size(2))
+        } else {
+            let res = ((i[1] as u16) << 8) + i[0] as u16;
+            Ok((&i[2..], res as u32))
+        }
+    }
+
+}
 
 pub fn calculate_bits_1(v:u8)->u8{
     let mut x =v;

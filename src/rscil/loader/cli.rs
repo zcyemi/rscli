@@ -5,6 +5,7 @@ use crate::rscil::loader::util::parse_str_pad;
 use crate::rscil::loader::util::calculate_bits_u64;
 use crate::rscil::loader::util::resolve_result;
 use crate::rscil::loader::util::return_err;
+use crate::rscil::loader::util::parse_id;
 
 use std::slice::Iter;
 use std::cmp::Ordering;
@@ -129,7 +130,7 @@ pub struct CLITildeStream {
     pub sorted: u64,
     pub rows: Vec<u32>,
 
-    pub table_module: Option<ModuleTbl>,
+    pub table_module: Option<Box<ModuleTbl>>,
 }
 
 
@@ -185,13 +186,15 @@ impl CLITildeStream {
                 let rows = ret.unwrap();
 
                 tildestream.rows = rows.1;
-                tildestream.parse_table();
-                Result::Ok((rows.0, tildestream))
+                let input = tildestream.parse_table(rows.0);
+                Result::Ok((input, tildestream))
             }
         }
     }
 
-    fn parse_table(self: &Self) {
+    fn parse_table<'a>(self: &mut Self, input: &'a [u8]) -> &'a [u8] {
+        let mut input = input;
+
         let valid = &self.valid;
         println!("{:#b}", *valid);
 
@@ -199,16 +202,32 @@ impl CLITildeStream {
         tbls.sort();
 
         let tbl_iter = tbls.iter();
+        let heapsize = self.heap_size;
+        let bitString = heapsize & 0b1 > 0;
+        let bitGUID = heapsize & 0b10 > 0;
+        let bitBlob = heapsize & 0b100 > 0;
 
-        for &iter in tbl_iter {
+        let mut suc = false;
+
+        for (ind, &iter) in tbl_iter.enumerate() {
             if TableId::is_table_valid(&self.valid, &iter) {
                 println!("has table {:?}", iter);
             }
         }
+
+        let tblModule = resolve_result(&mut suc, ModuleTbl::parse(input, bitString, bitGUID, bitBlob, self.rows[0]));
+        if suc {
+            let tbl = tblModule.unwrap();
+            input = tbl.0;
+            self.table_module = Some(Box::new(tbl.1));
+        }
+
+
+        input
     }
 }
 
-#[derive(Debug, Copy, Clone,Eq)]
+#[derive(Debug, Copy, Clone, Eq)]
 pub enum TableId {
     Assembly = 0x20,
     AssemblyOS = 0x22,
@@ -247,10 +266,9 @@ pub enum TableId {
     TypeSpec = 0x1B,
 }
 
-impl Ord for TableId{
-
+impl Ord for TableId {
     fn cmp(&self, other: &TableId) -> Ordering {
-        (*self as u8) .cmp(&(*other as u8))
+        (*self as u8).cmp(&(*other as u8))
     }
 }
 
@@ -271,8 +289,8 @@ impl TableId {
         valid & (1 << (*id as u64)) > 0
     }
 
-    pub fn map()->[TableId;36]{
-        static TABLES: [TableId; 36] =[
+    pub fn map() -> [TableId; 36] {
+        static TABLES: [TableId; 36] = [
             TableId::EventMap,
             TableId::Assembly,
             TableId::AssemblyOS,
@@ -314,9 +332,81 @@ impl TableId {
     }
 }
 
+
+type Index = u32;
+
 #[derive(Debug)]
 pub struct ModuleTbl {
-    pub  row: u32,
+    pub row: Index,
+    pub data: Vec<MetaModule>,
 }
 
+impl ModuleTbl {
+    named_args!(pub parse(bitstr:bool,bitGUID:bool,bitBlob:bool,rows:u32)<&[u8],ModuleTbl>,do_parse!(
+        meta: count!(call!(MetaModule::parse,bitstr,bitGUID,bitBlob),rows as usize) >>
+        (ModuleTbl{
+            row: rows,
+            data: meta
+        })
+    ));
+}
+
+#[derive(Debug)]
+pub struct MetaModule {
+    pub name: Index,
+    pub Mvid: Index,
+}
+
+impl MetaModule {
+    named_args!(pub parse(bitStr:bool,bitGUID:bool,bitBlob:bool)<&[u8],MetaModule>,do_parse!(
+       take!(2) >>
+       name: call!(parse_id,bitStr) >>
+       mvid: call!(parse_id,bitGUID) >>
+       call!(parse_id,bitGUID) >>
+       call!(parse_id,bitGUID) >>
+       (MetaModule{
+            name:name,
+            Mvid:mvid,
+       })
+    ));
+}
+
+
+
+pub trait CLIDataItem<T>{
+    fn parse<'a>(i:&'a [u8],bitStr:bool,bitGUID:bool,bitBlob:bool)->IResult<&'a [u8],T>;
+}
+
+pub struct CLITbl<D> where D: CLIDataItem<D>
+{
+    pub row:u32,
+    pub data: Vec<D>,
+}
+
+impl<D> CLITbl<D> where D: CLIDataItem<D>
+{
+
+    named_args!(pub parse(bitstr:bool,bitGUID:bool,bitBlob:bool,rows:u32)<&[u8],CLITbl::<D>>,do_parse!(
+        meta: count!(call!(D::parse,bitstr,bitGUID,bitBlob),rows as usize) >>
+        (CLITbl::<D>{
+            row: rows,
+            data: meta
+        })
+    ));
+}
+
+pub struct TypeRef{
+}
+
+impl CLIDataItem<TypeRef> for TypeRef{
+    fn parse<'a>(i: &'a [u8], bitStr: bool, bitGUID: bool, bitBlob: bool) -> Result<(&'a [u8], TypeRef), Err<&'a [u8], u32>> {
+        unimplemented!()
+    }
+}
+
+
+pub fn xx(input:&[u8]){
+
+    let x = CLITbl<TypeRef>::parse(input,false,false,false,10);
+}
 
