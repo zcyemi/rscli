@@ -132,6 +132,8 @@ pub struct CLITildeStream {
     pub sorted: u64,
     pub rows: Vec<u32>,
 
+    pub column_size:HashMap<CLIColumnType,u8>,
+
     pub table_module: Option<Box<ModuleTbl>>,
 }
 
@@ -146,6 +148,7 @@ impl CLITildeStream {
             sorted: 0,
             rows: vec![],
             table_module: Option::None,
+            column_size:HashMap::new(),
         }
     }
 
@@ -219,8 +222,7 @@ impl CLITildeStream {
         }
 
         let column_byte_size = parse_cli_column_size(tables,&self.rows);
-
-        println!("column_byte_size: {:?}",column_byte_size);
+        self.column_size = column_byte_size;
 
         let tblModule = resolve_result(&mut suc, ModuleTbl::parse(input,heapsize, self.rows[0]));
         if suc {
@@ -268,8 +270,6 @@ pub enum CLIColumnType{
     ResolutionScope = 11,
     TypeOrMethodDef = 12,
 }
-
-
 
 
 pub fn parse_cli_column_size(tblVec:Vec<TableId>,tblrows:&Vec<u32>)-> HashMap<CLIColumnType,u8>{
@@ -503,6 +503,9 @@ impl TableId {
 
 
 type Index = u32;
+type StrIndex = u32;
+type GUIDIndex = u32;
+type BlobIndex = u32;
 
 #[derive(Debug)]
 pub struct ModuleTbl {
@@ -562,14 +565,23 @@ impl<D> CLITbl<D> where D: CLIDataItem<D>
     ));
 }
 
-pub struct TypeRef{
+pub enum TagIndex{
+    None,
+    Val(u32),
 }
 
-impl CLIDataItem<TypeRef> for TypeRef{
-    fn parse<'a>(i: &'a [u8], heapsize:&'a CLIHeapSize) -> IResult<&'a [u8],TypeRef> {
-        unimplemented!()
-    }
+pub struct TypeRef{
+    pub resolution_scope: TagIndex,
+    pub name: StrIndex,
+    pub namespace:StrIndex,
 }
+
+//impl CLIDataItem<TypeRef> for TypeRef{
+//
+//    name_args!(pub parse(hs:&CLIHeapSize)<&[u8],TypeRef>,
+//        do_parse
+//    );
+//}
 
 //
 //pub fn xx(input:&[u8]){

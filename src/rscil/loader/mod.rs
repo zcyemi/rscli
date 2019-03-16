@@ -5,6 +5,11 @@ pub mod util;
 use winpe::WinPE;
 use cli::CLIData;
 
+use std::error::Error;
+use std::fs::File;
+use std::io::prelude::*;
+use std::path::Path;
+
 #[derive(Debug)]
 pub struct DllFile<'a>{
     pub pe: WinPE<'a>,
@@ -39,11 +44,27 @@ impl<'a> DllFile<'a>{
 
 pub fn loader_test(){
 
-    let data = include_bytes!("D:/TestDll.dll");
+//    let data = include_bytes!("D:/TestDll.dll");
+//
+//    let dll = DllFile::load(data).unwrap();
+//
+//    print!("{:?}",dll);
 
-    let dll = DllFile::load(data).unwrap();
+    let path = Path::new("D:/TestDll.dll");
+    let display = path.display();
 
-    print!("{:?}",dll);
+    let mut file = match File::open(&path){
+        Err(why)=> panic!("count not open file: {}",why.description()),
+        Ok(file)=> file
+    };
+
+    let mut data:Vec<u8> = Vec::new();
+
+
+    let result = match file.read_to_end(&mut data) {
+        Err(why)=> panic!("count not read file: {}",why.description()),
+        Ok(_)=> println!("{} contains: \n {}",display,data.len()),
+    };
 
 }
 
