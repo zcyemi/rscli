@@ -1,4 +1,5 @@
-use nom::{IResult,HexDisplay,be_u8,le_u8,le_u16,le_u32,ErrorKind,need_more,Needed};
+#[allow(Dead_Code)]
+use nom::{IResult,le_u32,ErrorKind,need_more,Needed};
 
 use std::str;
 

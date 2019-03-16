@@ -1,4 +1,4 @@
-use nom::{IResult, HexDisplay, be_u8, le_u8, le_u16, le_u32, le_u64};
+use nom::{IResult, le_u8, le_u16, le_u32, le_u64};
 
 use crate::rscil::loader::util::DataInfo;
 use crate::rscil::loader::util::parse_str_pad;
@@ -7,8 +7,10 @@ use crate::rscil::loader::util::resolve_result;
 use crate::rscil::loader::util::return_err;
 use crate::rscil::loader::util::parse_id;
 
-use std::slice::Iter;
 use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::*;
+use std::hash::{Hash,Hasher};
 
 #[derive(Debug)]
 pub struct CLIData<'a> {
@@ -202,30 +204,194 @@ impl CLITildeStream {
         tbls.sort();
 
         let tbl_iter = tbls.iter();
-        let heapsize = self.heap_size;
-        let bitString = heapsize & 0b1 > 0;
-        let bitGUID = heapsize & 0b10 > 0;
-        let bitBlob = heapsize & 0b100 > 0;
+        let heapsize =CLIHeapSize::new( self.heap_size);
+
 
         let mut suc = false;
+
+        let mut tables:Vec<TableId> = Vec::new();
 
         for (ind, &iter) in tbl_iter.enumerate() {
             if TableId::is_table_valid(&self.valid, &iter) {
                 println!("has table {:?}", iter);
+                tables.push(iter);
             }
         }
 
-        let tblModule = resolve_result(&mut suc, ModuleTbl::parse(input, bitString, bitGUID, bitBlob, self.rows[0]));
+        let column_byte_size = parse_cli_column_size(tables,&self.rows);
+
+        println!("column_byte_size: {:?}",column_byte_size);
+
+        let tblModule = resolve_result(&mut suc, ModuleTbl::parse(input,heapsize, self.rows[0]));
         if suc {
             let tbl = tblModule.unwrap();
             input = tbl.0;
             self.table_module = Some(Box::new(tbl.1));
         }
-
-
         input
     }
 }
+
+#[derive(Default,Copy, Clone)]
+pub struct CLIHeapSize{
+    pub string:bool,
+    pub guid:bool,
+    pub blob:bool,
+}
+
+impl CLIHeapSize{
+    pub fn new(heapsize:u8)->CLIHeapSize{
+        CLIHeapSize{
+            string:heapsize & 0b1 > 0,
+            guid: heapsize & 0b10 > 0,
+            blob: heapsize & 0b100 > 0,
+        }
+    }
+    fn default() -> Self {
+        CLIHeapSize{string:false,guid:false,blob:false}
+    }
+}
+
+#[derive(Eq,Debug,PartialEq,Hash)]
+pub enum CLIColumnType{
+    TypeDefOrRef =0,
+    HasConstant = 1,
+    HasCustomAttribute = 2,
+    HasFieldMarshall = 3,
+    HasDeclSecurity = 4,
+    MemberRefParent = 5,
+    HasSemantics = 6,
+    MethodDefOrRef =7,
+    MemberForwarded = 8,
+    Implementation = 9,
+    CustomAttributeType = 10,
+    ResolutionScope = 11,
+    TypeOrMethodDef = 12,
+}
+
+
+
+
+pub fn parse_cli_column_size(tblVec:Vec<TableId>,tblrows:&Vec<u32>)-> HashMap<CLIColumnType,u8>{
+    let mut hashmap:HashMap<CLIColumnType,u8> = HashMap::new();
+
+    let mut rowvec:[u32;64] = [0;64];
+
+    for (i,tbl) in tblVec.iter().enumerate(){
+        rowvec[*tbl as usize] = tblrows[i];
+    }
+
+    let rowvec = rowvec.to_vec();
+
+
+    hashmap.insert(CLIColumnType::TypeDefOrRef,parse_cli_column_item(&rowvec,vec![
+        TableId::TypeDef,
+        TableId::TypeRef,
+        TableId::TypeSpec,
+    ]));
+    hashmap.insert(CLIColumnType::HasConstant,parse_cli_column_item(&rowvec,vec![
+        TableId::Field,
+        TableId::Param,
+        TableId::Property,
+    ]));
+    hashmap.insert(CLIColumnType::HasCustomAttribute,parse_cli_column_item_extra(&rowvec,vec![
+        TableId::MethodDef,
+        TableId::Field,
+        TableId::TypeRef,
+        TableId::TypeDef,
+        TableId::Param,
+        TableId::InterfaceImpl,
+        TableId::MemberRef,
+        TableId::Module,
+        //TableId::Permission,
+        TableId::Property,
+        TableId::Event,
+        TableId::StandAloneSig,
+        TableId::ModuleRef,
+        TableId::TypeSpec,
+        TableId::Assembly,
+        TableId::AssemblyRef,
+        TableId::File,
+        TableId::ExportedType,
+        TableId::ManifestResource,
+        TableId::GenericParam,
+        TableId::GenericParamConstraint,
+        TableId::MethodSpec,
+    ],1));
+    hashmap.insert(CLIColumnType::HasFieldMarshall,parse_cli_column_item(&rowvec,vec![
+        TableId::Field,
+        TableId::Param,
+    ]));
+    hashmap.insert(CLIColumnType::HasDeclSecurity,parse_cli_column_item(&rowvec,vec![
+        TableId::TypeDef,
+        TableId::MethodDef,
+        TableId::Assembly,
+    ]));
+    hashmap.insert(CLIColumnType::MemberRefParent,parse_cli_column_item(&rowvec,vec![
+        TableId::TypeDef,
+        TableId::TypeRef,
+        TableId::ModuleRef,
+        TableId::MethodDef,
+        TableId::TypeSpec
+    ]));
+
+    hashmap.insert(CLIColumnType::HasSemantics,parse_cli_column_item(&rowvec,vec![
+        TableId::Event,
+        TableId::Property,
+    ]));
+    hashmap.insert(CLIColumnType::MethodDefOrRef,parse_cli_column_item(&rowvec,vec![
+        TableId::MethodDef,
+        TableId::MemberRef,
+    ]));
+    hashmap.insert(CLIColumnType::MemberForwarded,parse_cli_column_item(&rowvec,vec![
+        TableId::Field,
+        TableId::MethodDef,
+    ]));
+    hashmap.insert(CLIColumnType::Implementation,parse_cli_column_item(&rowvec,vec![
+        TableId::Field,
+        TableId::AssemblyRef,
+        TableId::ExportedType,
+    ]));
+    hashmap.insert(CLIColumnType::CustomAttributeType,parse_cli_column_item_extra(&rowvec,vec![
+        TableId::MethodDef,
+        TableId::MemberRef,
+    ],3_u8));
+    hashmap.insert(CLIColumnType::ResolutionScope,parse_cli_column_item(&rowvec,vec![
+        TableId::Module,
+        TableId::ModuleRef,
+        TableId::AssemblyRef,
+        TableId::TypeRef,
+    ]));
+    hashmap.insert(CLIColumnType::TypeOrMethodDef,parse_cli_column_item(&rowvec,vec![
+        TableId::TypeDef,
+        TableId::MethodDef,
+    ]));
+    hashmap
+
+}
+
+
+pub fn parse_cli_column_item(tblRows:&Vec<u32>,columnTbl:Vec<TableId>)->u8{
+    parse_cli_column_item_extra(tblRows,columnTbl,0)
+}
+
+pub fn parse_cli_column_item_extra(tblRows:&Vec<u32>,columnTbl:Vec<TableId>,extra_tag_count:u8)->u8
+{
+    let bittag = ((columnTbl.len() + extra_tag_count as usize) as f32).log2().ceil() as u8;
+
+    let mut maxrow =0;
+    for &col in columnTbl.iter() {
+        let tbl_row = tblRows[col as usize];
+        maxrow = tbl_row.max(maxrow);
+    }
+
+    let mut bytesize:u8 = 2;
+    if maxrow > (1 <<(16-bittag)){
+        bytesize = 4;
+    }
+    bytesize
+}
+
 
 #[derive(Debug, Copy, Clone, Eq)]
 pub enum TableId {
@@ -240,14 +406,17 @@ pub enum TableId {
     CustomAttribute = 0x0C,
     DeclSecurity = 0x0E,
     EventMap = 0x12,
+    Event = 0x14,
     ExportedType = 0x27,
     Field = 0x04,
     FieldLayout = 0x10,
     FieldMarshal = 0x0D,
+    FieldRVA = 0x1D,
     File = 0x26,
-    GenericParam = 0x1D,
+    GenericParam = 0x2A,
     GenericParamConstraint = 0x2C,
     ImplMap = 0x1C,
+    InterfaceImpl = 0x09,
     ManifestResource = 0x28,
     MemberRef = 0x0A,
     MethodDef = 0x06,
@@ -342,8 +511,8 @@ pub struct ModuleTbl {
 }
 
 impl ModuleTbl {
-    named_args!(pub parse(bitstr:bool,bitGUID:bool,bitBlob:bool,rows:u32)<&[u8],ModuleTbl>,do_parse!(
-        meta: count!(call!(MetaModule::parse,bitstr,bitGUID,bitBlob),rows as usize) >>
+    named_args!(pub parse(hs:CLIHeapSize,rows:u32)<&[u8],ModuleTbl>,do_parse!(
+        meta: count!(call!(MetaModule::parse,hs),rows as usize) >>
         (ModuleTbl{
             row: rows,
             data: meta
@@ -354,27 +523,26 @@ impl ModuleTbl {
 #[derive(Debug)]
 pub struct MetaModule {
     pub name: Index,
-    pub Mvid: Index,
+    pub mvid: Index,
 }
 
 impl MetaModule {
-    named_args!(pub parse(bitStr:bool,bitGUID:bool,bitBlob:bool)<&[u8],MetaModule>,do_parse!(
+    named_args!(pub parse(hs:CLIHeapSize)<&[u8],MetaModule>,do_parse!(
        take!(2) >>
-       name: call!(parse_id,bitStr) >>
-       mvid: call!(parse_id,bitGUID) >>
-       call!(parse_id,bitGUID) >>
-       call!(parse_id,bitGUID) >>
+       name: call!(parse_id,hs.string) >>
+       mvid: call!(parse_id,hs.guid) >>
+       call!(parse_id,hs.guid) >>
+       call!(parse_id,hs.guid) >>
        (MetaModule{
             name:name,
-            Mvid:mvid,
+            mvid:mvid,
        })
     ));
 }
 
 
-
 pub trait CLIDataItem<T>{
-    fn parse<'a>(i:&'a [u8],bitStr:bool,bitGUID:bool,bitBlob:bool)->IResult<&'a [u8],T>;
+    fn parse<'a>(i:&'a [u8],heapsize:&'a CLIHeapSize)->IResult<&'a [u8],T>;
 }
 
 pub struct CLITbl<D> where D: CLIDataItem<D>
@@ -385,9 +553,8 @@ pub struct CLITbl<D> where D: CLIDataItem<D>
 
 impl<D> CLITbl<D> where D: CLIDataItem<D>
 {
-
-    named_args!(pub parse(bitstr:bool,bitGUID:bool,bitBlob:bool,rows:u32)<&[u8],CLITbl::<D>>,do_parse!(
-        meta: count!(call!(D::parse,bitstr,bitGUID,bitBlob),rows as usize) >>
+    named_args!(pub parse<'a>(hs:&'a CLIHeapSize,rows:u32)<&'a [u8],CLITbl<D>>,do_parse!(
+        meta: count!(call!(D::parse,hs),rows as usize) >>
         (CLITbl::<D>{
             row: rows,
             data: meta
@@ -399,14 +566,15 @@ pub struct TypeRef{
 }
 
 impl CLIDataItem<TypeRef> for TypeRef{
-    fn parse<'a>(i: &'a [u8], bitStr: bool, bitGUID: bool, bitBlob: bool) -> Result<(&'a [u8], TypeRef), Err<&'a [u8], u32>> {
+    fn parse<'a>(i: &'a [u8], heapsize:&'a CLIHeapSize) -> IResult<&'a [u8],TypeRef> {
         unimplemented!()
     }
 }
 
-
-pub fn xx(input:&[u8]){
-
-    let x = CLITbl<TypeRef>::parse(input,false,false,false,10);
-}
-
+//
+//pub fn xx(input:&[u8]){
+//
+//    let heapsize:CLIHeapSize = Default::default();
+//    let x = CLITbl::<TypeRef>::parse(input,&heapsize,10);
+//}
+//

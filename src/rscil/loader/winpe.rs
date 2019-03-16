@@ -1,4 +1,4 @@
-use nom::{IResult,HexDisplay,be_u8,le_u8,le_u16,le_u32};
+use nom::{le_u8,le_u16,le_u32};
 use crate::rscil::loader::util::DataInfo;
 
 #[derive(Debug)]

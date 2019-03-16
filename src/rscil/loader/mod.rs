@@ -2,11 +2,8 @@ pub mod winpe;
 pub mod cli;
 pub mod util;
 
-
 use winpe::WinPE;
 use cli::CLIData;
-
-use nom::{IResult,HexDisplay,be_u8,le_u8,le_u16,le_u32};
 
 #[derive(Debug)]
 pub struct DllFile<'a>{
