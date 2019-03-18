@@ -44,8 +44,12 @@ impl CLIData{
         let meta_base_addr = meta.meta_pos;
 
         let (str_off,str_size) = meta.get_stream_rva("#Strings");
+        let str_start = meta_base_addr + str_off;
+        let str_end = str_start + str_size;
+        let string_stream = CLIStringStream::parse(reader,(str_start,str_end));
 
-        println!("{} {}",meta_base_addr + str_off ,meta_base_addr+str_off + str_size);
+        println!("{:?}",string_stream);
+
 
         clidata.meta = meta;
         clidata
@@ -282,28 +286,30 @@ impl CLITildeStream{
 
 }
 
-
-pub struct CLIStringStream<'a>{
-    pub data:Vec<&'a str>,
+#[derive(Debug)]
+pub struct CLIStringStream{
+    pub data:Vec<String>,
 }
 
-impl<'a> CLIStringStream<'a>{
-    pub fn parse(reader:&'a mut BinaryReader,stream_info:(usize,usize))->CLIStringStream<'a>{
-        let cur_pos= reader.pos;
-        reader.seek(stream_info.0+1);
+impl CLIStringStream{
+    pub fn parse(reader:& mut BinaryReader,stream_info:(usize,usize))->CLIStringStream{
 
         let max_addr = stream_info.1;
+        let start_addr = stream_info.0;
 
-        let mut str_vec:Vec<&str> = Vec::new();
+        let prev_pos = reader.pos;
+        reader.seek(start_addr+1);
 
-//        loop {
-//            let str = reader.str_read_ref();
-//            if str.is_none(){
-//                break;
-//            }else{
-//                str_vec.push(str.unwrap());
-//            }
-//        };
+        let mut str_vec:Vec<String> = Vec::new();
+        while reader.pos < max_addr {
+            let str = reader.str_read();
+            if str.is_none(){
+                break;
+            }else{
+                str_vec.push(str.unwrap());
+            }
+        }
+        reader.seek(prev_pos);
 
         CLIStringStream{
             data:str_vec

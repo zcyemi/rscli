@@ -140,7 +140,7 @@ impl<'a> BinaryReader<'a> {
         String::from(ret)
     }
 
-    pub fn str_read_ref(self:&mut Self)->Option<&str>{
+    pub fn str_read(self:&mut Self) ->Option<String>{
         let data = self.raw_data;
         let mut pos = self.pos;
         let ret= if data[pos] == 0 {
@@ -154,10 +154,9 @@ impl<'a> BinaryReader<'a> {
                 }
                 pos +=1;
             };
-
             let str = unsafe{str::from_utf8_unchecked(&data[self.pos..pos])};
             self.pos = pos+1;
-            Some(str)
+            Some(String::from(str))
         };
         ret
     }
@@ -216,7 +215,7 @@ impl<'a> BinaryReader<'a> {
     }
 
     pub fn seek(self: &mut Self, pos: usize) {
-        self.pos = pos;
+        (*self).pos = pos;
     }
 
     pub fn repeat<T>(&mut self, f: fn(&mut Self) -> T, count: u32) -> Vec<T> {
