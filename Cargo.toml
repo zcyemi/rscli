@@ -1,0 +1,8 @@
+[package]
+name = "rscli"
+version = "0.1.0"
+authors = ["yemi <zcyemi@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+lazy_static = "1.3.0"
