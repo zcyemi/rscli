@@ -10,6 +10,7 @@ use crate::rscli::util::BitUtility;
 
 use std::collections::HashMap;
 use std::iter::*;
+use std::rc::Rc;
 
 pub mod tbl;
 
@@ -20,6 +21,8 @@ pub struct CLIData{
     pub header:CLIHeader,
     pub meta:CLIMetaData,
     pub tilde_stream: CLITildeStream,
+
+    pub string_stream:CLIStringStream,
 
     pub tbl_module:Option<CLITable<MetaModule>>,
     pub tbl_typeref:Option<CLITable<MetaTypeRef>>,
@@ -49,6 +52,7 @@ impl CLIData{
         let str_end = str_start + str_size;
         let string_stream = CLIStringStream::parse(reader,(str_start,str_end));
 
+        clidata.string_stream = string_stream;
 
         clidata.parse_tables(reader);
 
@@ -60,14 +64,15 @@ impl CLIData{
     fn parse_tables(&mut self,reader:&mut BinaryReader){
 
         let tilde_stream = &self.tilde_stream;
-        self.tbl_module = Some(MetaModule::parse_table(reader,tilde_stream));
-        self.tbl_typeref = Some(MetaTypeRef::parse_table(reader,tilde_stream));
-        self.tbl_typedef = Some(MetaTypeDef::parse_table(reader,tilde_stream));
-        self.tbl_methoddef = Some(MetaMethodDef::parse_table(reader,tilde_stream));
-        self.tbl_member_ref = Some(MetaMemberRef::parse_table(reader,tilde_stream));
-        self.tbl_custom_attribute = Some(MetaCustomAttribute::parse_table(reader,tilde_stream));
-        self.tbl_assembly = Some(MetaAssembly::parse_table(reader,tilde_stream));
-        self.tbl_assembly_ref = Some(MetaAssemblyRef::parse_table(reader,tilde_stream));
+        let string_stream = &self.string_stream;
+        self.tbl_module = Some(MetaModule::parse_table(reader,tilde_stream,string_stream));
+        self.tbl_typeref = Some(MetaTypeRef::parse_table(reader,tilde_stream,string_stream));
+        self.tbl_typedef = Some(MetaTypeDef::parse_table(reader,tilde_stream,string_stream));
+        self.tbl_methoddef = Some(MetaMethodDef::parse_table(reader,tilde_stream,string_stream));
+        self.tbl_member_ref = Some(MetaMemberRef::parse_table(reader,tilde_stream,string_stream));
+        self.tbl_custom_attribute = Some(MetaCustomAttribute::parse_table(reader,tilde_stream,string_stream));
+        self.tbl_assembly = Some(MetaAssembly::parse_table(reader,tilde_stream,string_stream));
+        self.tbl_assembly_ref = Some(MetaAssemblyRef::parse_table(reader,tilde_stream,string_stream));
 //        println!("module end{:#x}",reader.pos);
     }
 }
@@ -297,9 +302,10 @@ impl CLITildeStream{
 
 }
 
-#[derive(Debug)]
+#[derive(Debug,Default)]
 pub struct CLIStringStream{
-    pub data:Vec<String>,
+    pub data:Vec<Rc<String>>,
+    pub index_map:HashMap<u32,u32>,
 }
 
 impl CLIStringStream{
@@ -311,19 +317,45 @@ impl CLIStringStream{
         let prev_pos = reader.pos;
         reader.seek(start_addr+1);
 
-        let mut str_vec:Vec<String> = Vec::new();
+        let mut data:Vec<Rc<String>> = Vec::new();
+        let mut index_map = HashMap::new();
+
+        let str_empty = Rc::new(String::from(""));
+        data.push(str_empty);
+        index_map.insert(0,0);
+
+        let mut str_count = 1;
+        let mut str_pos:u32 = 1;
         while reader.pos < max_addr {
             let str = reader.str_read();
             if str.is_none(){
                 break;
             }else{
-                str_vec.push(str.unwrap());
+                index_map.insert(str_pos,str_count);
+                str_pos = (reader.pos - start_addr) as u32;
+                data.push(Rc::new(str.unwrap()));
+                str_count +=1;
             }
         }
         reader.seek(prev_pos);
 
         CLIStringStream{
-            data:str_vec
+            data,
+            index_map,
         }
+    }
+
+    pub fn get_str_by_index(&self,ind:u32)->Rc<String>{
+
+
+        let index = self.index_map.get(&ind);
+        let val = if index.is_none(){
+            Rc::clone(&self.data[0])
+        }
+        else{
+            let index = index.unwrap();
+            Rc::clone(&self.data[*index as usize])
+        };
+        val
     }
 }
