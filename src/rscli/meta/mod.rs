@@ -13,25 +13,26 @@ use std::iter::*;
 
 pub mod tbl;
 
+
 #[derive(Default,Debug)]
 pub struct CLIData{
+
     pub header:CLIHeader,
     pub meta:CLIMetaData,
     pub tilde_stream: CLITildeStream,
 
     pub tbl_module:Option<CLITable<MetaModule>>,
+    pub tbl_typeref:Option<CLITable<MetaTypeRef>>,
+    pub tbl_typedef:Option<CLITable<MetaTypeDef>>,
+    pub tbl_methoddef:Option<CLITable<MetaMethodDef>>,
+    pub tbl_member_ref:Option<CLITable<MetaMemberRef>>,
+    pub tbl_custom_attribute:Option<CLITable<MetaCustomAttribute>>,
+    pub tbl_assembly:Option<CLITable<MetaAssembly>>,
+    pub tbl_assembly_ref:Option<CLITable<MetaAssemblyRef>>,
+
 }
 
 impl CLIData{
-
-    pub fn default()->CLIData{
-        CLIData{
-            header: Default::default(),
-            meta:Default::default(),
-            tilde_stream:Default::default(),
-            tbl_module:Option::None,
-        }
-    }
 
     pub fn parse_cli_data(reader:&mut BinaryReader)->CLIData{
 
@@ -48,11 +49,26 @@ impl CLIData{
         let str_end = str_start + str_size;
         let string_stream = CLIStringStream::parse(reader,(str_start,str_end));
 
-        println!("{:?}",string_stream);
+
+        clidata.parse_tables(reader);
 
 
         clidata.meta = meta;
         clidata
+    }
+
+    fn parse_tables(&mut self,reader:&mut BinaryReader){
+
+        let tilde_stream = &self.tilde_stream;
+        self.tbl_module = Some(MetaModule::parse_table(reader,tilde_stream));
+        self.tbl_typeref = Some(MetaTypeRef::parse_table(reader,tilde_stream));
+        self.tbl_typedef = Some(MetaTypeDef::parse_table(reader,tilde_stream));
+        self.tbl_methoddef = Some(MetaMethodDef::parse_table(reader,tilde_stream));
+        self.tbl_member_ref = Some(MetaMemberRef::parse_table(reader,tilde_stream));
+        self.tbl_custom_attribute = Some(MetaCustomAttribute::parse_table(reader,tilde_stream));
+        self.tbl_assembly = Some(MetaAssembly::parse_table(reader,tilde_stream));
+        self.tbl_assembly_ref = Some(MetaAssemblyRef::parse_table(reader,tilde_stream));
+//        println!("module end{:#x}",reader.pos);
     }
 }
 
@@ -240,7 +256,7 @@ impl CLITildeStream{
         for (t,&tableid) in table_map.iter().enumerate(){
             if valid & (1 << tableid as u8) > 0 {
                 self.table_valid.push(tableid);
-                table_rows[t] = rows[index];
+                table_rows[tableid as usize] = rows[index];
                 index +=1;
             }
         }
@@ -278,11 +294,6 @@ impl CLITildeStream{
         self.column_size[&column]
     }
 
-//    fn parse_tables(&mut self,reader:&mut BinaryReader){
-//
-//        self.tbl_module = Some(MetaModule::parse_table(reader,self));
-//
-//    }
 
 }
 

@@ -250,10 +250,10 @@ pub struct MetaModule {
 
 impl MetaItem<MetaModule> for MetaModule {
     fn parse_table(reader: &mut BinaryReader, tilde_stream: &CLITildeStream) -> CLITable<MetaModule>{
-        let rows = tilde_stream.get_table_row(CLITableId::Module);
+        let row = tilde_stream.get_table_row(CLITableId::Module);
         let mut data:Vec<MetaModule> = Vec::new();
         let heap_size = tilde_stream.heap_size;
-        for _ in 0..rows{
+        for _ in 0..row{
             reader.ate(2);
             let item_name = reader.le_uint(heap_size.string);
             let item_mvid = reader.le_uint(heap_size.guid);
@@ -265,26 +265,77 @@ impl MetaItem<MetaModule> for MetaModule {
             });
         };
         CLITable::<MetaModule>{
-            row:rows,
-            data:data,
+            row,
+            data,
         }
     }
 }
 
-
+#[derive(Debug)]
 pub struct MetaTypeRef{
     pub resolution_scope: TagIndex,//ResolutionScope
     pub name: StrIndex,
     pub namespace:StrIndex,
 }
 
+impl MetaItem<MetaTypeRef> for MetaTypeRef{
+    fn parse_table(reader: &mut BinaryReader, tilde_stream: &CLITildeStream) -> CLITable<MetaTypeRef> {
+        let row = tilde_stream.get_table_row(CLITableId::TypeRef);
+        let heap_size = tilde_stream.heap_size;
+        let column_size =tilde_stream.get_column_byte(CLIColumnType::ResolutionScope);
+        let mut data = Vec::new();
+        for _ in 0..row{
+            let scope = reader.le_uint(column_size);
+            let name = reader.le_uint(heap_size.string);
+            let namespace = reader.le_uint(heap_size.string);
+            data.push(MetaTypeRef{
+                resolution_scope:scope,
+                name,
+                namespace
+            });
+        };
+        CLITable::<MetaTypeRef>{row,data }
+    }
+}
+
+#[derive(Debug)]
 pub struct MetaTypeDef{
-    pub type_attribute: TagIndex, //TypeAttribute
+    pub type_attribute: TagIndex, //TypeAttribute 4byte
     pub name:StrIndex,
     pub namespace:StrIndex,
     pub extends: TagIndex, //TypeDefOrRef
     pub field_list:RowIndex,//Field table TODO
     pub method_list:RowIndex//MethodDef table TODO
+}
+
+impl MetaItem<MetaTypeDef> for MetaTypeDef{
+    fn parse_table(reader: &mut BinaryReader, tilde_stream: &CLITildeStream) -> CLITable<MetaTypeDef> {
+        let row = tilde_stream.get_table_row(CLITableId::TypeDef);
+        let heap_size = tilde_stream.heap_size;
+        let byte_extends = tilde_stream.get_column_byte(CLIColumnType::TypeDefOrRef);
+
+        let mut data= Vec::new();
+        for _ in 0..row{
+            let type_attr = reader.le_u32();
+            let name = reader.le_uint(heap_size.string);
+            let namespace = reader.le_uint(heap_size.string);
+            let extends = reader.le_uint(byte_extends);
+            let field_list = reader.le_u16() as u32;
+            let method_list = reader.le_u16() as u32;
+            data.push(MetaTypeDef{
+                type_attribute:type_attr,
+                name,
+                namespace,
+                extends,
+                field_list,
+                method_list,
+            });
+        };
+        CLITable::<MetaTypeDef>{
+            row,
+            data
+        }
+    }
 }
 
 pub struct MetaPropertyMap{
@@ -330,6 +381,7 @@ pub struct MetaMethodImpl{
     pub method_decl:TagIndex,// MethodDefOrRef,
 }
 
+#[derive(Debug)]
 pub struct MetaMethodDef{
     pub rva:u32,
     pub impl_flags:u16,//MethodImplAttributes
@@ -339,10 +391,51 @@ pub struct MetaMethodDef{
     pub param_list:RowIndex,//Param table TODO
 }
 
+impl MetaItem<MetaMethodDef> for MetaMethodDef{
+    fn parse_table(reader: &mut BinaryReader, tilde_stream: &CLITildeStream) -> CLITable<MetaMethodDef> {
+        let row = tilde_stream.get_table_row(CLITableId::MethodDef);
+        let heap_size = tilde_stream.heap_size;
+        let mut data = Vec::new();
+        for _ in 0..row{
+            let rva = reader.le_u32();
+            let impl_flags = reader.le_u16();
+            let flags = reader.le_u16();
+            let name = reader.le_u16() as u32;
+            let signature = reader.le_u16() as u32;
+            let param_list = reader.le_u16() as u32;
+            data.push(MetaMethodDef{
+                rva,impl_flags,flags,name,signature,param_list
+            });
+        };
+        CLITable::<MetaMethodDef>{row,data}
+    }
+}
+
+#[derive(Debug)]
 pub struct MetaMemberRef{
-    pub class:TagIndex, //MemobeRefParent
+    pub class:TagIndex, //MemberRefParent
     pub name:StrIndex,
     pub signature:BlobIndex,
+}
+
+impl MetaItem<MetaMemberRef> for MetaMemberRef{
+    fn parse_table(reader: &mut BinaryReader, tilde_stream: &CLITildeStream) -> CLITable<MetaMemberRef> {
+        let row = tilde_stream.get_table_row(CLITableId::MemberRef);
+        let heap_size = tilde_stream.heap_size;
+        let column_class = tilde_stream.get_column_byte(CLIColumnType::MemberRefParent);
+
+        let mut data = Vec::new();
+        for _ in 0..row{
+            let class = reader.le_uint(column_class);
+            let name = reader.le_uint(heap_size.string);
+            let signature = reader.le_uint(heap_size.blob);
+            data.push(MetaMemberRef{
+                class,name,signature
+            });
+        };
+        CLITable::<MetaMemberRef>{row,data}
+
+    }
 }
 
 pub struct MetaManifestResource{
@@ -428,10 +521,34 @@ pub struct MetaDeclSecurity{
     pub permission_set:BlobIndex,
 }
 
+#[derive(Debug)]
 pub struct MetaCustomAttribute{
     pub parent:TagIndex,//HasCustomAttribute,
     pub attr_type:TagIndex,//CustomAttributeType,
     pub value:BlobIndex,
+}
+
+impl MetaItem<MetaCustomAttribute> for MetaCustomAttribute{
+    fn parse_table(reader: &mut BinaryReader, tilde_stream: &CLITildeStream) -> CLITable<MetaCustomAttribute> {
+        let row = tilde_stream.get_table_row(CLITableId::CustomAttribute);
+        let heap_size = tilde_stream.heap_size;
+        let column_parent = tilde_stream.get_column_byte(CLIColumnType::HasCustomAttribute);
+        let column_attr_type = tilde_stream.get_column_byte(CLIColumnType::CustomAttributeType);
+
+        let mut data = Vec::new();
+
+        for _ in 0..row{
+            let parent = reader.le_uint(column_parent);
+            let attr_type = reader.le_uint(column_attr_type);
+            let value = reader.le_uint(heap_size.blob);
+            data.push(MetaCustomAttribute{
+                parent,attr_type,value
+            })
+        }
+
+        CLITable::<MetaCustomAttribute>{row,data}
+
+    }
 }
 
 pub struct MetaConstant{
@@ -458,6 +575,7 @@ pub struct MetaAssemblyRefOS{
     pub asssmbly_ref:RowIndex,//AssemblyRef table
 }
 
+#[derive(Debug)]
 pub struct MetaAssemblyRef{
     pub maj_ver:u16,
     pub min_ver:u16,
@@ -467,6 +585,36 @@ pub struct MetaAssemblyRef{
     pub name:StrIndex,
     pub culture:StrIndex,
     pub hash_value:BlobIndex,
+}
+
+impl MetaItem<MetaAssemblyRef> for MetaAssemblyRef{
+    fn parse_table(reader: &mut BinaryReader, tilde_stream: &CLITildeStream) -> CLITable<MetaAssemblyRef> {
+        let row = tilde_stream.get_table_row(CLITableId::AssemblyRef);
+        let heap_size = tilde_stream.heap_size;
+
+        let mut data = Vec::new();
+        for _ in 0..row{
+            let maj_ver = reader.le_u16();
+            let min_ver = reader.le_u16();
+            let build_num = reader.le_u16();
+            let revision_num = reader.le_u16();
+            let flags = reader.le_u32();
+            let name = reader.le_uint(heap_size.string);
+            let culture = reader.le_uint(heap_size.string);
+            let hash_value = reader.le_uint(heap_size.blob);
+            data.push(MetaAssemblyRef{
+                maj_ver,
+                min_ver,
+                build_num,
+                revision_num,
+                flags,
+                name,
+                culture,
+                hash_value
+            });
+        }
+        CLITable::<MetaAssemblyRef>{row,data}
+    }
 }
 
 pub struct MetaAssemblyProcessor{
@@ -479,6 +627,7 @@ pub struct MetaAssemblyOS{
     pub minor_ver:u32,
 }
 
+#[derive(Debug)]
 pub struct MetaAssembly{
     pub hash_alg_id:u32, //AssemblyHashAlgorithms,
     pub major_ver:u16,
@@ -489,4 +638,35 @@ pub struct MetaAssembly{
     pub public_key:BlobIndex,
     pub name:StrIndex,
     pub culture:StrIndex,
+}
+
+impl MetaItem<MetaAssembly> for MetaAssembly{
+    fn parse_table(reader: &mut BinaryReader, tilde_stream: &CLITildeStream) -> CLITable<MetaAssembly> {
+        let row = tilde_stream.get_table_row(CLITableId::Assembly);
+        let heap_size = tilde_stream.heap_size;
+        let mut data =Vec::new();
+        for _ in 0..row{
+            let hash_alg_id = reader.le_u32();
+            let major_ver = reader.le_u16();
+            let minor_ver = reader.le_u16();
+            let build_num = reader.le_u16();
+            let revision_num = reader.le_u16();
+            let flags = reader.le_u32();
+            let public_key = reader.le_uint(heap_size.blob);
+            let name = reader.le_uint(heap_size.string);
+            let culture = reader.le_uint(heap_size.string);
+            data.push(MetaAssembly{
+                hash_alg_id,
+                major_ver,
+                minor_ver,
+                build_num,
+                revision_num,
+                flags,
+                public_key,
+                name,
+                culture,
+            });
+        }
+        CLITable::<MetaAssembly>{row,data}
+    }
 }
