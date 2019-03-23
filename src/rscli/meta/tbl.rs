@@ -226,7 +226,7 @@ impl CLITableId {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug,Default)]
 pub struct CLITable<D>
 {
     pub row:u32,
@@ -405,6 +405,9 @@ impl MetaItem<MetaMethodDef> for MetaMethodDef{
             let name = reader.le_u16() as u32;
             let signature = reader.le_u16() as u32;
             let param_list = reader.le_u16() as u32;
+
+
+
             data.push(MetaMethodDef{
                 rva,impl_flags,flags,name:string_stream.get_str_by_index(name),signature,param_list
             });
@@ -584,6 +587,7 @@ pub struct MetaAssemblyRef{
     pub build_num:u16,
     pub revision_num:u16,
     pub flags:u32,//AssemblyFlags
+//    pub public_key_or_token:u32,
     pub name:Rc<String>,
     pub culture:Rc<String>,
     pub hash_value:BlobIndex,
@@ -601,9 +605,13 @@ impl MetaItem<MetaAssemblyRef> for MetaAssemblyRef{
             let build_num = reader.le_u16();
             let revision_num = reader.le_u16();
             let flags = reader.le_u32();
+            reader.le_uint(heap_size.blob);
             let name = reader.le_uint(heap_size.string);
             let culture = reader.le_uint(heap_size.string);
             let hash_value = reader.le_uint(heap_size.blob);
+
+            println!("{:?}",&name);
+            println!("{:?}",&culture);
             data.push(MetaAssemblyRef{
                 maj_ver,
                 min_ver,
@@ -628,6 +636,25 @@ pub struct MetaAssemblyOS{
     pub major_ver:u32,
     pub minor_ver:u32,
 }
+
+#[derive(Debug,Default)]
+pub struct MetaStandAloneSig{
+    pub signature:u32,
+}
+
+impl MetaItem<MetaStandAloneSig> for MetaStandAloneSig{
+    fn parse_table(reader: &mut BinaryReader, tilde_stream: &CLITildeStream, string_stream: &CLIStringStream) -> CLITable<MetaStandAloneSig> {
+        let row = tilde_stream.get_table_row(CLITableId::StandAloneSig);
+        let heap_size = tilde_stream.heap_size;
+        let mut data= Vec::new();
+        for _ in 0..row {
+            let signature = reader.le_uint(heap_size.blob);
+            data.push( MetaStandAloneSig{signature});
+        }
+        CLITable::<MetaStandAloneSig>{row,data}
+    }
+}
+
 
 #[derive(Debug)]
 pub struct MetaAssembly{

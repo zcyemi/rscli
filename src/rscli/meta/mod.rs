@@ -30,6 +30,7 @@ pub struct CLIData{
     pub tbl_methoddef:Option<CLITable<MetaMethodDef>>,
     pub tbl_member_ref:Option<CLITable<MetaMemberRef>>,
     pub tbl_custom_attribute:Option<CLITable<MetaCustomAttribute>>,
+    pub tbl_stand_alone_sig:CLITable<MetaStandAloneSig>,
     pub tbl_assembly:Option<CLITable<MetaAssembly>>,
     pub tbl_assembly_ref:Option<CLITable<MetaAssemblyRef>>,
 
@@ -71,7 +72,9 @@ impl CLIData{
         self.tbl_methoddef = Some(MetaMethodDef::parse_table(reader,tilde_stream,string_stream));
         self.tbl_member_ref = Some(MetaMemberRef::parse_table(reader,tilde_stream,string_stream));
         self.tbl_custom_attribute = Some(MetaCustomAttribute::parse_table(reader,tilde_stream,string_stream));
+        self.tbl_stand_alone_sig = MetaStandAloneSig::parse_table(reader,tilde_stream,string_stream);
         self.tbl_assembly = Some(MetaAssembly::parse_table(reader,tilde_stream,string_stream));
+        println!("module end{:#x}",reader.pos);
         self.tbl_assembly_ref = Some(MetaAssemblyRef::parse_table(reader,tilde_stream,string_stream));
 //        println!("module end{:#x}",reader.pos);
     }
