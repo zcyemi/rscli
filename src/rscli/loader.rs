@@ -40,6 +40,8 @@ impl DllFile{
         reader.ate(16);
 
         let cli = Box::new(CLIData::parse_cli_data(reader));
+
+        println!("{:?}",&cli);
         DllFile{
             data:dat,
             clidata:cli

@@ -7,6 +7,7 @@ use std::rc::Rc;
 use crate::BinaryReader;
 use crate::rscli::meta::CLITildeStream;
 use crate::rscli::meta::CLIStringStream;
+use crate::rscli::runtime::reflection::RuntimeInfoType;
 
 
 #[derive(Eq, Debug, PartialEq, Hash, Copy, Clone)]
@@ -231,6 +232,53 @@ pub struct CLITable<D>
 {
     pub row: u32,
     pub data: Vec<D>,
+}
+
+impl<D> CLITable<D> where D: MetaItem<D> {
+    pub fn get_data_by_index(&self, index: usize) -> &D {
+        &self.data[index]
+    }
+
+    pub fn get_data_by_filter(&self, filter: &Fn(&D) -> bool) -> Option<&D> {
+        let mut ret = Option::None;
+        for item in self.data.iter() {
+            if filter(item) {
+                ret = Some(item);
+                break;
+            }
+        }
+        ret
+    }
+
+    pub fn get_data_by_filter_ind(&self, filter: &Fn(&D) -> bool, index: &mut usize) -> Option<&D> {
+        let mut ret = Option::None;
+        for (ind, item) in self.data.iter().enumerate() {
+            if filter(item) {
+                ret = Some(item);
+                *index = ind;
+                break;
+            }
+        }
+        ret
+    }
+
+    pub fn create_runtime_type_by_filter<I: RuntimeInfoType<I, D>>(&self, filter: &Fn(&D) -> bool) -> Option<I> {
+        let mut ind = 0_usize;
+        let ret = self.get_data_by_filter_ind(filter, &mut ind);
+        let ret = match ret {
+            Some(t) => {
+                let x = I::new(t, ind);
+                Some(x)
+            }
+            None => None
+        };
+        ret
+    }
+
+    pub fn create_runtime_type_by_ind<I: RuntimeInfoType<I, D>>(&self, ind: usize) -> I {
+        let item: &D = &self.data[ind];
+        I::new(item, ind)
+    }
 }
 
 

@@ -1,6 +1,6 @@
-
+#![allow(dead_code)]
 #[macro_use]
-extern crate  lazy_static;
+extern crate lazy_static;
 
 mod rscli;
 
@@ -12,7 +12,6 @@ use std::cell::RefCell;
 use crate::rscli::runtime::context::Context;
 
 fn main() {
-
     let dll = rscli::loader::load_dll("D:/TestDll.dll");
 
     let rc_dll = Rc::new(RefCell::new(dll));
@@ -20,5 +19,4 @@ fn main() {
 
     let mut context = Context::new();
     context.reflection.load_dll(&rc_dll);
-
 }
