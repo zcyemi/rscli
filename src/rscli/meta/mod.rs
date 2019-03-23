@@ -15,32 +15,29 @@ use std::rc::Rc;
 pub mod tbl;
 
 
-#[derive(Default,Debug)]
-pub struct CLIData{
-
-    pub header:CLIHeader,
-    pub meta:CLIMetaData,
+#[derive(Default, Debug)]
+pub struct CLIData {
+    pub header: CLIHeader,
+    pub meta: CLIMetaData,
     pub tilde_stream: CLITildeStream,
 
-    pub string_stream:CLIStringStream,
+    pub string_stream: CLIStringStream,
 
-    pub tbl_module:Option<CLITable<MetaModule>>,
-    pub tbl_typeref:Option<CLITable<MetaTypeRef>>,
-    pub tbl_typedef:Option<CLITable<MetaTypeDef>>,
-    pub tbl_methoddef:Option<CLITable<MetaMethodDef>>,
-    pub tbl_member_ref:Option<CLITable<MetaMemberRef>>,
-    pub tbl_custom_attribute:Option<CLITable<MetaCustomAttribute>>,
-    pub tbl_stand_alone_sig:CLITable<MetaStandAloneSig>,
-    pub tbl_assembly:Option<CLITable<MetaAssembly>>,
-    pub tbl_assembly_ref:Option<CLITable<MetaAssemblyRef>>,
+    pub tbl_module: CLITable<MetaModule>,
+    pub tbl_typeref: CLITable<MetaTypeRef>,
+    pub tbl_typedef: CLITable<MetaTypeDef>,
+    pub tbl_methoddef: CLITable<MetaMethodDef>,
+    pub tbl_member_ref: CLITable<MetaMemberRef>,
+    pub tbl_custom_attribute: CLITable<MetaCustomAttribute>,
+    pub tbl_stand_alone_sig: CLITable<MetaStandAloneSig>,
+    pub tbl_assembly: CLITable<MetaAssembly>,
+    pub tbl_assembly_ref: CLITable<MetaAssemblyRef>,
 
 }
 
-impl CLIData{
-
-    pub fn parse_cli_data(reader:&mut BinaryReader)->CLIData{
-
-        let mut clidata:CLIData = Default::default();
+impl CLIData {
+    pub fn parse_cli_data(reader: &mut BinaryReader) -> CLIData {
+        let mut clidata: CLIData = Default::default();
 
         clidata.header = CLIHeader::parse(reader);
         let meta = CLIMetaData::parse(reader);
@@ -48,10 +45,10 @@ impl CLIData{
 
         let meta_base_addr = meta.meta_pos;
 
-        let (str_off,str_size) = meta.get_stream_rva("#Strings");
+        let (str_off, str_size) = meta.get_stream_rva("#Strings");
         let str_start = meta_base_addr + str_off;
         let str_end = str_start + str_size;
-        let string_stream = CLIStringStream::parse(reader,(str_start,str_end));
+        let string_stream = CLIStringStream::parse(reader, (str_start, str_end));
 
         clidata.string_stream = string_stream;
 
@@ -62,25 +59,23 @@ impl CLIData{
         clidata
     }
 
-    fn parse_tables(&mut self,reader:&mut BinaryReader){
-
+    fn parse_tables(&mut self, reader: &mut BinaryReader) {
         let tilde_stream = &self.tilde_stream;
         let string_stream = &self.string_stream;
-        self.tbl_module = Some(MetaModule::parse_table(reader,tilde_stream,string_stream));
-        self.tbl_typeref = Some(MetaTypeRef::parse_table(reader,tilde_stream,string_stream));
-        self.tbl_typedef = Some(MetaTypeDef::parse_table(reader,tilde_stream,string_stream));
-        self.tbl_methoddef = Some(MetaMethodDef::parse_table(reader,tilde_stream,string_stream));
-        self.tbl_member_ref = Some(MetaMemberRef::parse_table(reader,tilde_stream,string_stream));
-        self.tbl_custom_attribute = Some(MetaCustomAttribute::parse_table(reader,tilde_stream,string_stream));
-        self.tbl_stand_alone_sig = MetaStandAloneSig::parse_table(reader,tilde_stream,string_stream);
-        self.tbl_assembly = Some(MetaAssembly::parse_table(reader,tilde_stream,string_stream));
-        println!("module end{:#x}",reader.pos);
-        self.tbl_assembly_ref = Some(MetaAssemblyRef::parse_table(reader,tilde_stream,string_stream));
+        self.tbl_module = MetaModule::parse_table(reader, tilde_stream, string_stream);
+        self.tbl_typeref = MetaTypeRef::parse_table(reader, tilde_stream, string_stream);
+        self.tbl_typedef = MetaTypeDef::parse_table(reader, tilde_stream, string_stream);
+        self.tbl_methoddef = MetaMethodDef::parse_table(reader, tilde_stream, string_stream);
+        self.tbl_member_ref = MetaMemberRef::parse_table(reader, tilde_stream, string_stream);
+        self.tbl_custom_attribute = MetaCustomAttribute::parse_table(reader, tilde_stream, string_stream);
+        self.tbl_stand_alone_sig = MetaStandAloneSig::parse_table(reader, tilde_stream, string_stream);
+        self.tbl_assembly = MetaAssembly::parse_table(reader, tilde_stream, string_stream);
+        self.tbl_assembly_ref = MetaAssemblyRef::parse_table(reader, tilde_stream, string_stream);
 //        println!("module end{:#x}",reader.pos);
     }
 }
 
-#[derive(Debug,Default)]
+#[derive(Debug, Default)]
 pub struct CLIHeader {
     pub major_runtime_ver: u16,
     pub minor_runtime_ver: u16,
@@ -90,30 +85,29 @@ pub struct CLIHeader {
     pub strong_name_signature: DataPointer,
 }
 
-impl CLIHeader{
-
-    pub fn default()->CLIHeader{
-        CLIHeader{
-            major_runtime_ver:0,
-            minor_runtime_ver:0,
+impl CLIHeader {
+    pub fn default() -> CLIHeader {
+        CLIHeader {
+            major_runtime_ver: 0,
+            minor_runtime_ver: 0,
             metadata: Default::default(),
-            flags:0,
-            entry_point_token:0,
+            flags: 0,
+            entry_point_token: 0,
             strong_name_signature: Default::default(),
         }
     }
 
-    pub fn parse(reader:&mut BinaryReader)->CLIHeader{
-        let mut header=  CLIHeader::default();
+    pub fn parse(reader: &mut BinaryReader) -> CLIHeader {
+        let mut header = CLIHeader::default();
 
-        reader.tag(&[0x48,0,0,0]);
+        reader.tag(&[0x48, 0, 0, 0]);
         header.major_runtime_ver = reader.le_u16();
         header.minor_runtime_ver = reader.le_u16();
         header.metadata = reader.data_pointer();
         header.flags = reader.le_u32();
         header.entry_point_token = reader.le_u32();
         let resources = reader.data_pointer();
-        header.strong_name_signature= reader.data_pointer();
+        header.strong_name_signature = reader.data_pointer();
         let code_manager_tbl = reader.ate(8);
         let vtable_fixups = reader.data_pointer();
         let export_addr_tbl_jumps = reader.ate(8);
@@ -122,33 +116,33 @@ impl CLIHeader{
     }
 }
 
-#[derive(Debug,Default)]
-pub struct CLIMetaData{
-    pub major_version:u16,
-    pub minor_version:u16,
-    pub cli_ve_str:String,
-    pub num_of_stream:u16,
-    pub stream_header:Vec<CLIStreamHeader>,
-    pub meta_pos:usize,
+#[derive(Debug, Default)]
+pub struct CLIMetaData {
+    pub major_version: u16,
+    pub minor_version: u16,
+    pub cli_ve_str: String,
+    pub num_of_stream: u16,
+    pub stream_header: Vec<CLIStreamHeader>,
+    pub meta_pos: usize,
 }
 
-impl CLIMetaData{
-    pub fn default()->CLIMetaData{
-        CLIMetaData{
-            major_version:0,
-            minor_version:0,
-            cli_ve_str:String::new(),
-            num_of_stream:0,
-            stream_header:vec![],
-            meta_pos:0,
+impl CLIMetaData {
+    pub fn default() -> CLIMetaData {
+        CLIMetaData {
+            major_version: 0,
+            minor_version: 0,
+            cli_ve_str: String::new(),
+            num_of_stream: 0,
+            stream_header: vec![],
+            meta_pos: 0,
         }
     }
 
-    pub fn parse(reader:& mut BinaryReader)->CLIMetaData{
-        let mut metadata:CLIMetaData = Default::default();
+    pub fn parse(reader: &mut BinaryReader) -> CLIMetaData {
+        let mut metadata: CLIMetaData = Default::default();
 
-        reader.ate_till_tag(&[0x42,0x53,0x4A,0x42]);
-        metadata.meta_pos= reader.pos;
+        reader.ate_till_tag(&[0x42, 0x53, 0x4A, 0x42]);
+        metadata.meta_pos = reader.pos;
         reader.ate(4);
 
         metadata.major_version = reader.le_u16();
@@ -159,17 +153,17 @@ impl CLIMetaData{
         reader.ate(2);
         metadata.num_of_stream = reader.le_u16();
 
-        metadata.stream_header= reader.repeat(CLIStreamHeader::parse,metadata.num_of_stream as u32);
+        metadata.stream_header = reader.repeat(CLIStreamHeader::parse, metadata.num_of_stream as u32);
 
         metadata
     }
 
-    pub fn get_stream_rva(&self,name:&str)->(usize,usize){
+    pub fn get_stream_rva(&self, name: &str) -> (usize, usize) {
         let stream_haeder = &self.stream_header;
-        let mut ret:(usize,usize) = (0,0);
+        let mut ret: (usize, usize) = (0, 0);
         for stream in stream_haeder.iter() {
             if name == stream.name {
-                ret = (stream.offset as usize,stream.size as usize);
+                ret = (stream.offset as usize, stream.size as usize);
                 break;
             }
         };
@@ -178,62 +172,60 @@ impl CLIMetaData{
 }
 
 #[derive(Debug)]
-pub struct CLIStreamHeader{
-    pub offset:u32,
-    pub size:u32,
-    pub name:String,
+pub struct CLIStreamHeader {
+    pub offset: u32,
+    pub size: u32,
+    pub name: String,
 }
 
-impl CLIStreamHeader{
-    pub fn parse(reader:& mut BinaryReader)->CLIStreamHeader{
+impl CLIStreamHeader {
+    pub fn parse(reader: &mut BinaryReader) -> CLIStreamHeader {
         let offset = reader.le_u32();
         let size = reader.le_u32();
         let name = reader.str_pad();
-        CLIStreamHeader{
-            offset:offset,
-            size:size,
-            name:name
+        CLIStreamHeader {
+            offset: offset,
+            size: size,
+            name: name,
         }
     }
 }
 
-#[derive(Debug,Copy, Clone,Default)]
-pub struct CLIHeapSize{
-    pub string:u8,
-    pub guid:u8,
-    pub blob:u8,
+#[derive(Debug, Copy, Clone, Default)]
+pub struct CLIHeapSize {
+    pub string: u8,
+    pub guid: u8,
+    pub blob: u8,
 }
 
-impl CLIHeapSize{
-    pub fn new(heapsize:u8)->CLIHeapSize{
-        CLIHeapSize{
-            string: if heapsize & 0b1 > 0 {4}else{2},
-            guid: if heapsize & 0b10 > 0 {4}else{2},
-            blob: if heapsize & 0b100 > 0 {4}else{2},
+impl CLIHeapSize {
+    pub fn new(heapsize: u8) -> CLIHeapSize {
+        CLIHeapSize {
+            string: if heapsize & 0b1 > 0 { 4 } else { 2 },
+            guid: if heapsize & 0b10 > 0 { 4 } else { 2 },
+            blob: if heapsize & 0b100 > 0 { 4 } else { 2 },
         }
     }
 }
 
-#[derive(Debug,Default)]
-pub struct CLITildeStream{
-    pub major_ver:u8,
-    pub minor_ver:u8,
-    pub heap_size:CLIHeapSize,
-    pub valid:u64,
-    pub sorted:u64,
+#[derive(Debug, Default)]
+pub struct CLITildeStream {
+    pub major_ver: u8,
+    pub minor_ver: u8,
+    pub heap_size: CLIHeapSize,
+    pub valid: u64,
+    pub sorted: u64,
     pub rows: Vec<u32>,
 
-
-    pub column_size:HashMap<CLIColumnType,u8>,
-    pub table_rows:Vec<u32>,
-    pub table_valid:Vec<CLITableId>,
+    pub column_size: HashMap<CLIColumnType, u8>,
+    pub table_rows: Vec<u32>,
+    pub table_valid: Vec<CLITableId>,
 
 }
 
-impl CLITildeStream{
-
-    pub fn parse(reader:&mut BinaryReader)->CLITildeStream{
-        let mut tilde:CLITildeStream = Default::default();
+impl CLITildeStream {
+    pub fn parse(reader: &mut BinaryReader) -> CLITildeStream {
+        let mut tilde: CLITildeStream = Default::default();
 
         reader.ate(4);
         tilde.major_ver = reader.le_u8();
@@ -243,119 +235,112 @@ impl CLITildeStream{
         tilde.heap_size = CLIHeapSize::new(raw_heap_size);
 
         reader.tag(&[0x01]);
-        tilde.valid= reader.le_u64();
+        tilde.valid = reader.le_u64();
         tilde.sorted = reader.le_u64();
 
         let table_count = BitUtility::bits_count_u64(tilde.valid) as u32;
-        tilde.rows = reader.repeat(BinaryReader::le_u32,table_count);
+        tilde.rows = reader.repeat(BinaryReader::le_u32, table_count);
         tilde.calculate_table_data();
 
         tilde
     }
 
-    fn calculate_table_data(&mut self){
-        let table_count= self.rows.len();
-        let mut table_rows:Vec<u32> = vec![0;64];
+    fn calculate_table_data(&mut self) {
+        let table_count = self.rows.len();
+        let mut table_rows: Vec<u32> = vec![0; 64];
         let rows = &self.rows;
         let mut table_map = CLITableId::map();
         table_map.sort();
         let valid = self.valid;
-        let mut index:usize = 0;
-        for (t,&tableid) in table_map.iter().enumerate(){
+        let mut index: usize = 0;
+        for (t, &tableid) in table_map.iter().enumerate() {
             if valid & (1 << tableid as u8) > 0 {
                 self.table_valid.push(tableid);
                 table_rows[tableid as usize] = rows[index];
-                index +=1;
+                index += 1;
             }
         }
 
         //column rows
-        let mut column_size:HashMap<CLIColumnType,u8> = HashMap::new();
+        let mut column_size: HashMap<CLIColumnType, u8> = HashMap::new();
         let column_map = &CLIColumnMap;
-        for (&column,table_vec) in column_map.iter() {
-
+        for (&column, table_vec) in column_map.iter() {
             let bit_count = (table_vec.len() as f32).log2().ceil() as u8;
             let mut tbl_max_row = 0_u32;
-            for &tblid in table_vec.iter(){
+            for &tblid in table_vec.iter() {
                 if tblid != CLITableId::Invalid {
                     tbl_max_row = tbl_max_row.max(table_rows[tblid as usize])
                 }
             }
 
-            let byte_size:u8 = if tbl_max_row > (1 << (16 - bit_count)) {
+            let byte_size: u8 = if tbl_max_row > (1 << (16 - bit_count)) {
                 4
-            }else{
+            } else {
                 2
             };
-            column_size.insert(column,byte_size);
+            column_size.insert(column, byte_size);
         }
 
         self.table_rows = table_rows;
         self.column_size = column_size;
     }
 
-    fn get_table_row(self:&Self,table_id:CLITableId)->u32{
+    fn get_table_row(self: &Self, table_id: CLITableId) -> u32 {
         self.table_rows[table_id as usize]
     }
 
-    fn get_column_byte(self:&Self,column:CLIColumnType)->u8{
+    fn get_column_byte(self: &Self, column: CLIColumnType) -> u8 {
         self.column_size[&column]
     }
-
-
 }
 
-#[derive(Debug,Default)]
-pub struct CLIStringStream{
-    pub data:Vec<Rc<String>>,
-    pub index_map:HashMap<u32,u32>,
+#[derive(Debug, Default)]
+pub struct CLIStringStream {
+    pub data: Vec<Rc<String>>,
+    pub index_map: HashMap<u32, u32>,
 }
 
-impl CLIStringStream{
-    pub fn parse(reader:& mut BinaryReader,stream_info:(usize,usize))->CLIStringStream{
-
+impl CLIStringStream {
+    pub fn parse(reader: &mut BinaryReader, stream_info: (usize, usize)) -> CLIStringStream {
         let max_addr = stream_info.1;
         let start_addr = stream_info.0;
 
         let prev_pos = reader.pos;
-        reader.seek(start_addr+1);
+        reader.seek(start_addr + 1);
 
-        let mut data:Vec<Rc<String>> = Vec::new();
+        let mut data: Vec<Rc<String>> = Vec::new();
         let mut index_map = HashMap::new();
 
         let str_empty = Rc::new(String::from(""));
         data.push(str_empty);
-        index_map.insert(0,0);
+        index_map.insert(0, 0);
 
         let mut str_count = 1;
-        let mut str_pos:u32 = 1;
+        let mut str_pos: u32 = 1;
         while reader.pos < max_addr {
             let str = reader.str_read();
-            if str.is_none(){
+            if str.is_none() {
                 break;
-            }else{
-                index_map.insert(str_pos,str_count);
+            } else {
+                index_map.insert(str_pos, str_count);
                 str_pos = (reader.pos - start_addr) as u32;
                 data.push(Rc::new(str.unwrap()));
-                str_count +=1;
+                str_count += 1;
             }
         }
         reader.seek(prev_pos);
 
-        CLIStringStream{
+        CLIStringStream {
             data,
             index_map,
         }
     }
 
-    pub fn get_str_by_index(&self,ind:u32)->Rc<String>{
-
-
+    pub fn get_str_by_index(&self, ind: u32) -> Rc<String> {
         let index = self.index_map.get(&ind);
-        let val = if index.is_none(){
+        let val = if index.is_none() {
             Rc::clone(&self.data[0])
-        }
-        else{
+        } else {
             let index = index.unwrap();
             Rc::clone(&self.data[*index as usize])
         };
