@@ -6,8 +6,19 @@ mod rscli;
 
 use rscli::util::reader::BinaryReader;
 
+use rscli::runtime::*;
+use std::rc::Rc;
+use std::cell::RefCell;
+use crate::rscli::runtime::context::Context;
+
 fn main() {
 
-    rscli::loader::load_dll("D:/TestDll.dll");
+    let dll = rscli::loader::load_dll("D:/TestDll.dll");
+
+    let rc_dll = Rc::new(RefCell::new(dll));
+
+
+    let mut context = Context::new();
+    context.reflection.load_dll(&rc_dll);
 
 }

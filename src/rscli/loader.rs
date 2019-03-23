@@ -2,6 +2,8 @@ use std::path::Path;
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
+use std::rc::Rc;
+use std::cell::RefCell;
 
 use crate::rscli::util::reader::BinaryReader;
 use crate::rscli::winpe::WinPe;
@@ -22,33 +24,25 @@ pub fn load_dll(file_path:&str)->DllFile{
     DllFile::new(data)
 }
 
-
 pub struct DllFile{
-    data:Vec<u8>,
+    pub data:Vec<u8>,
+    pub clidata:Box<CLIData>,
 }
 
 impl DllFile{
     pub fn new(dat:Vec<u8>)->DllFile{
-        let dllfile = DllFile{
-            data:dat
-        };
-        dllfile.parse();
-        dllfile
-    }
 
-    fn parse(&self){
-
-        let reader = &mut BinaryReader::new(&self.data);
+        let reader = &mut BinaryReader::new(&dat);
         reader.seek(0);
 
         WinPe::parse_winpe(reader);
 
         reader.ate(16);
 
-        let clidata = CLIData::parse_cli_data(reader);
-
-        println!("{:?}",clidata);
-
-
+        let cli = Box::new(CLIData::parse_cli_data(reader));
+        DllFile{
+            data:dat,
+            clidata:cli
+        }
     }
 }
