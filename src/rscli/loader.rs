@@ -24,6 +24,7 @@ pub fn load_dll(file_path:&str)->DllFile{
     DllFile::new(data)
 }
 
+#[derive(Debug,Default)]
 pub struct DllFile{
     pub data:Vec<u8>,
     pub clidata:Box<CLIData>,

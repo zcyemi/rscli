@@ -7,7 +7,6 @@ use std::rc::Rc;
 use crate::BinaryReader;
 use crate::rscli::meta::CLITildeStream;
 use crate::rscli::meta::CLIStringStream;
-use crate::rscli::runtime::reflection::RuntimeInfoType;
 
 
 #[derive(Eq, Debug, PartialEq, Hash, Copy, Clone)]
@@ -260,24 +259,6 @@ impl<D> CLITable<D> where D: MetaItem<D> {
             }
         }
         ret
-    }
-
-    pub fn create_runtime_type_by_filter<I: RuntimeInfoType<I, D>>(&self, filter: &Fn(&D) -> bool) -> Option<I> {
-        let mut ind = 0_usize;
-        let ret = self.get_data_by_filter_ind(filter, &mut ind);
-        let ret = match ret {
-            Some(t) => {
-                let x = I::new(t, ind);
-                Some(x)
-            }
-            None => None
-        };
-        ret
-    }
-
-    pub fn create_runtime_type_by_ind<I: RuntimeInfoType<I, D>>(&self, ind: usize) -> I {
-        let item: &D = &self.data[ind];
-        I::new(item, ind)
     }
 }
 
