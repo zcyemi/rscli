@@ -99,7 +99,6 @@ impl WinPe{
     fn parse_section(reader:&mut BinaryReader){
         let virtual_size = reader.le_u32();
         let virtual_addr = reader.le_u32();
-        println!("section addr: {:?}",virtual_addr);
         let size_of_raw_data = reader.le_u32();
         let pointer_to_raw_data = reader.le_u32();
         let pointer_to_relocations = reader.le_u32();

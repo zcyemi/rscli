@@ -707,9 +707,6 @@ impl MetaItem<MetaAssemblyRef> for MetaAssemblyRef {
             let name = reader.le_uint(heap_size.string);
             let culture = reader.le_uint(heap_size.string);
             let hash_value = reader.le_uint(heap_size.blob);
-
-            println!("{:?}", &name);
-            println!("{:?}", &culture);
             data.push(MetaAssemblyRef {
                 maj_ver,
                 min_ver,

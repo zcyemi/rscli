@@ -8,6 +8,7 @@ use crate::rscli::meta::tbl::CLITableId::TypeDef;
 use core::borrow::BorrowMut;
 use crate::rscli::util::reader::BinaryReader;
 use std::net::Shutdown::Read;
+use crate::rscli::runtime::il::{parse_il_instructions, Instruction};
 
 
 #[derive(Default)]
@@ -101,10 +102,9 @@ impl ReflectionInfo {
 
         for ind in start..end {
             let method = tbl_method.get_data_by_index(ind);
-
             let addr = clidata.get_rva_addr(method.rva as usize);
-            let method_impl = MethodImpl::parse(&mut reader,addr);
-            let method_info = MethodInfo::new(method, ind,method_impl);
+            let method_impl = MethodImpl::parse(&mut reader, addr);
+            let method_info = MethodInfo::new(method, ind, method_impl);
             let rc = Rc::new(method_info);
             vec.push(rc);
         }
@@ -164,52 +164,43 @@ pub struct MethodInfo {
     pub name: Rc<String>,
     pub meta_index: usize,
 
-    pub rva:usize,
-    pub instruction:RefCell<MethodImpl>,
+    pub rva: usize,
+    pub instruction: RefCell<MethodImpl>,
 }
 
 impl MethodInfo {
-    pub fn new(meta: &MetaMethodDef, index: usize,method_impl:MethodImpl) -> MethodInfo {
-        println!("{:?}",&meta);
-
+    pub fn new(meta: &MetaMethodDef, index: usize, method_impl: MethodImpl) -> MethodInfo {
         MethodInfo {
             name: meta.name.clone(),
             rva: meta.rva as usize,
             meta_index: index,
-            instruction:RefCell::new(Default::default()),
+            instruction: RefCell::new(method_impl),
         }
     }
 }
 
-#[derive(Debug,Default)]
-pub struct MethodImpl{
-
+#[derive(Debug, Default)]
+pub struct MethodImpl {
+    pub instruction: Vec<Instruction>,
 }
 
-impl MethodImpl{
-
-    pub fn parse(reader:&mut BinaryReader,rva:usize)->MethodImpl{
-
+impl MethodImpl {
+    pub fn parse(reader: &mut BinaryReader, rva: usize) -> MethodImpl {
         reader.seek(rva);
-
         let flag = reader.le_u8();
-
-        let thin_mode = flag & 0x11 == 0x10;
+        let thin_mode = (flag & 0b11) == 0b10;
         let mut size = 0_u32;
         if thin_mode {
             size = (flag >> 2) as u32;
-        }
-        else{
+        } else {
             reader.le_u8();
             let _max_stack = reader.le_u16();
             size = reader.le_u32();
             let _local_var_sig_toke = reader.le_u32();
         }
-
-
-        MethodImpl{
-
+        let instruction_set = parse_il_instructions(reader, size);
+        MethodImpl {
+            instruction: instruction_set
         }
     }
-
 }

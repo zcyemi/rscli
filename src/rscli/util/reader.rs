@@ -1,6 +1,7 @@
 #![allow(dead_code)]
 
 use std::str;
+use std::intrinsics::transmute;
 
 #[derive(Debug,Default)]
 pub struct DataPointer{
@@ -36,6 +37,7 @@ impl<'a> BinaryReader<'a> {
         ret
     }
 
+
     pub fn le_u16(self: &mut Self) -> u16 {
         let dat = self.raw_data;
         let pos = self.pos;
@@ -58,6 +60,20 @@ impl<'a> BinaryReader<'a> {
         let ret = ((i[pos+7] as u64) << 56) + ((i[pos+6] as u64) << 48) + ((i[pos+5] as u64) << 40) + ((i[pos+4] as u64) << 32) + ((i[pos+3] as u64) << 24)
             + ((i[pos+2] as u64) << 16) + ((i[pos+1] as u64) << 8) + i[pos+0] as u64;
         self.pos +=8;
+        ret
+    }
+
+    pub fn le_i8(&mut self)->i8{
+        let ret = self.raw_data[self.pos];
+        self.pos +=1;
+        unsafe {transmute(ret)}
+    }
+
+    pub fn le_i32(&mut self)->i32{
+        let pos = self.pos;
+        let dat = self.raw_data;
+        let ret = unsafe{ transmute::<[u8;4],i32>([dat[pos],dat[pos+1],dat[pos+2],dat[pos+3]])};
+        self.pos+=4;
         ret
     }
 

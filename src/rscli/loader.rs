@@ -37,13 +37,9 @@ impl DllFile{
         reader.seek(0);
 
         let pe = WinPe::parse_winpe(reader);
-        println!("pe: {:?}",&pe);
-
         reader.ate(16);
 
         let cli = Box::new(CLIData::parse_cli_data(reader,&pe));
-
-//        println!("{:?}",&cli);
         DllFile{
             data:dat,
             clidata:cli
