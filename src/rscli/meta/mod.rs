@@ -11,6 +11,7 @@ use crate::rscli::util::BitUtility;
 use std::collections::HashMap;
 use std::iter::*;
 use std::rc::Rc;
+use crate::rscli::winpe::WinPe;
 
 pub mod tbl;
 
@@ -20,6 +21,8 @@ pub struct CLIData {
     pub header: CLIHeader,
     pub meta: CLIMetaData,
     pub tilde_stream: CLITildeStream,
+
+    pub addr_offset_code:usize,
 
     pub string_stream: CLIStringStream,
 
@@ -36,7 +39,7 @@ pub struct CLIData {
 }
 
 impl CLIData {
-    pub fn parse_cli_data(reader: &mut BinaryReader) -> CLIData {
+    pub fn parse_cli_data(reader: &mut BinaryReader,pe:&WinPe) -> CLIData {
         let mut clidata: CLIData = Default::default();
 
         clidata.header = CLIHeader::parse(reader);
@@ -51,6 +54,7 @@ impl CLIData {
         let string_stream = CLIStringStream::parse(reader, (str_start, str_end));
 
         clidata.string_stream = string_stream;
+        clidata.addr_offset_code = (pe.base_of_code - 0x50) as usize;
 
         clidata.parse_tables(reader);
 
@@ -65,6 +69,7 @@ impl CLIData {
         self.tbl_module = MetaModule::parse_table(reader, tilde_stream, string_stream);
         self.tbl_typeref = MetaTypeRef::parse_table(reader, tilde_stream, string_stream);
         self.tbl_typedef = MetaTypeDef::parse_table(reader, tilde_stream, string_stream);
+        println!("module end{:#x}",reader.pos);
         self.tbl_methoddef = MetaMethodDef::parse_table(reader, tilde_stream, string_stream);
         self.tbl_member_ref = MetaMemberRef::parse_table(reader, tilde_stream, string_stream);
         self.tbl_custom_attribute = MetaCustomAttribute::parse_table(reader, tilde_stream, string_stream);
@@ -72,6 +77,10 @@ impl CLIData {
         self.tbl_assembly = MetaAssembly::parse_table(reader, tilde_stream, string_stream);
         self.tbl_assembly_ref = MetaAssemblyRef::parse_table(reader, tilde_stream, string_stream);
 //        println!("module end{:#x}",reader.pos);
+    }
+
+    pub fn get_rva_addr(&self,rva:usize)->usize{
+        rva - self.addr_offset_code
     }
 }
 
@@ -154,6 +163,8 @@ impl CLIMetaData {
         metadata.num_of_stream = reader.le_u16();
 
         metadata.stream_header = reader.repeat(CLIStreamHeader::parse, metadata.num_of_stream as u32);
+
+        println!("climetadat: {:?}",&metadata);
 
         metadata
     }

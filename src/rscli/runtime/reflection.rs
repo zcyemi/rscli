@@ -3,9 +3,11 @@ use std::cell::RefCell;
 use crate::rscli::loader::DllFile;
 use crate::rscli::meta::CLIData;
 use crate::rscli::meta::tbl::*;
-use std::fs::OpenOptions;
+use std::fs::{OpenOptions, read};
 use crate::rscli::meta::tbl::CLITableId::TypeDef;
 use core::borrow::BorrowMut;
+use crate::rscli::util::reader::BinaryReader;
+use std::net::Shutdown::Read;
 
 
 #[derive(Default)]
@@ -94,9 +96,15 @@ impl ReflectionInfo {
         let tbl_method = &clidata.tbl_methoddef;
         let mut vec = Vec::new();
 
+        let mut reader = BinaryReader::new(&dll.data);
+
+
         for ind in start..end {
             let method = tbl_method.get_data_by_index(ind);
-            let method_info = MethodInfo::new(method, ind);
+
+            let addr = clidata.get_rva_addr(method.rva as usize);
+            let method_impl = MethodImpl::parse(&mut reader,addr);
+            let method_info = MethodInfo::new(method, ind,method_impl);
             let rc = Rc::new(method_info);
             vec.push(rc);
         }
@@ -155,13 +163,53 @@ impl ClassInfo {
 pub struct MethodInfo {
     pub name: Rc<String>,
     pub meta_index: usize,
+
+    pub rva:usize,
+    pub instruction:RefCell<MethodImpl>,
 }
 
 impl MethodInfo {
-    pub fn new(meta: &MetaMethodDef, index: usize) -> MethodInfo {
+    pub fn new(meta: &MetaMethodDef, index: usize,method_impl:MethodImpl) -> MethodInfo {
+        println!("{:?}",&meta);
+
         MethodInfo {
             name: meta.name.clone(),
+            rva: meta.rva as usize,
             meta_index: index,
+            instruction:RefCell::new(Default::default()),
         }
     }
+}
+
+#[derive(Debug,Default)]
+pub struct MethodImpl{
+
+}
+
+impl MethodImpl{
+
+    pub fn parse(reader:&mut BinaryReader,rva:usize)->MethodImpl{
+
+        reader.seek(rva);
+
+        let flag = reader.le_u8();
+
+        let thin_mode = flag & 0x11 == 0x10;
+        let mut size = 0_u32;
+        if thin_mode {
+            size = (flag >> 2) as u32;
+        }
+        else{
+            reader.le_u8();
+            let _max_stack = reader.le_u16();
+            size = reader.le_u32();
+            let _local_var_sig_toke = reader.le_u32();
+        }
+
+
+        MethodImpl{
+
+        }
+    }
+
 }

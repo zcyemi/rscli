@@ -36,11 +36,12 @@ impl DllFile{
         let reader = &mut BinaryReader::new(&dat);
         reader.seek(0);
 
-        WinPe::parse_winpe(reader);
+        let pe = WinPe::parse_winpe(reader);
+        println!("pe: {:?}",&pe);
 
         reader.ate(16);
 
-        let cli = Box::new(CLIData::parse_cli_data(reader));
+        let cli = Box::new(CLIData::parse_cli_data(reader,&pe));
 
 //        println!("{:?}",&cli);
         DllFile{

@@ -1,7 +1,22 @@
 
 use crate::rscli::util::reader::BinaryReader;
 
+#[derive(Debug)]
 pub struct WinPe{
+    pub num_section:u16,
+    pub time_date_stamp:u32,
+    pub pointer_sbl_tbl:u32,
+    pub sz_opt_header:u16,
+    pub characteristics:u16,
+
+    pub maj_linker_ver:u8,
+    pub min_linker_ver:u8,
+    pub size_code:u32,
+    pub size_initialized_data:u32,
+    pub size_uninitialized_data:u32,
+    pub addr_entry_point:u32,
+    pub base_of_code:u32,
+    pub base_of_data:u32,
 
 }
 
@@ -36,7 +51,6 @@ impl WinPe{
         let addr_entry_point = reader.le_u32();
         let base_of_code = reader.le_u32();
         let base_of_data = reader.le_u32();
-
         //pe nt field
         reader.ate(68);
 
@@ -65,12 +79,27 @@ impl WinPe{
         let rsrc_section = WinPe::parse_section(reader);
         let reloc_section = WinPe::parse_section(reader);
 
-        WinPe{}
+        WinPe{
+            num_section,
+            time_date_stamp,
+            pointer_sbl_tbl,
+            sz_opt_header,
+            characteristics,
+            maj_linker_ver,
+            min_linker_ver,
+            size_code,
+            size_initialized_data,
+            size_uninitialized_data,
+            addr_entry_point,
+            base_of_code,
+            base_of_data
+        }
     }
 
     fn parse_section(reader:&mut BinaryReader){
         let virtual_size = reader.le_u32();
         let virtual_addr = reader.le_u32();
+        println!("section addr: {:?}",virtual_addr);
         let size_of_raw_data = reader.le_u32();
         let pointer_to_raw_data = reader.le_u32();
         let pointer_to_relocations = reader.le_u32();

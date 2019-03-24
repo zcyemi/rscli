@@ -23,4 +23,5 @@ fn main() {
     let test_class = context.reflection.get_class_info(&"TestClass").unwrap();
     let method_get_num = context.reflection.get_method_info(&"getNum",&test_class).unwrap();
 
+    println!("{:?}",method_get_num);
 }
