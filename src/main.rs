@@ -19,4 +19,9 @@ fn main() {
 
     let mut context = Context::new();
     context.reflection.load_dll(&rc_dll);
+
+
+    let type_x = context.reflection.get_type_info(&"TestClass",Some(&"TestLib"));
+
+    println!("{:?}",type_x);
 }

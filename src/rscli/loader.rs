@@ -41,7 +41,7 @@ impl DllFile{
 
         let cli = Box::new(CLIData::parse_cli_data(reader));
 
-        println!("{:?}",&cli);
+//        println!("{:?}",&cli);
         DllFile{
             data:dat,
             clidata:cli
