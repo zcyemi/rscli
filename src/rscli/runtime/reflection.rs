@@ -182,6 +182,7 @@ impl MethodInfo {
 #[derive(Debug, Default)]
 pub struct MethodImpl {
     pub instruction: Vec<Instruction>,
+
 }
 
 impl MethodImpl {

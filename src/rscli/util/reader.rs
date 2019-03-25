@@ -77,6 +77,16 @@ impl<'a> BinaryReader<'a> {
         ret
     }
 
+    pub fn tag_index(&mut self)->(u8,usize){
+        let tag = self.le_u8();
+
+        let dat = self.raw_data;
+        let pos = self.pos;
+        let ind = ((dat[pos] as u32) << 16) + ((dat[pos+1] as u32) << 8) + (dat[pos+2] as u32);
+        self.pos +=3;
+        (tag,ind as usize)
+    }
+
     pub fn ate(self: &mut Self, bytes: usize) {
         self.pos += bytes;
     }
