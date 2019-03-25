@@ -11,7 +11,7 @@ use std::net::Shutdown::Read;
 use crate::rscli::runtime::il::{parse_il_instructions, Instruction};
 
 
-#[derive(Default)]
+#[derive(Default,Debug)]
 pub struct ReflectionInfo {
     dll: Rc<RefCell<DllFile>>,
 
@@ -84,6 +84,8 @@ impl ReflectionInfo {
                 self.info_method.push(Rc::clone(&item));
             }
             let class_info = ClassInfo::new(&typedef, index, methods);
+
+
 
             let rc = Rc::new(class_info);
             self.info_class.push(rc.clone());
@@ -200,6 +202,7 @@ impl MethodImpl {
             let _local_var_sig_toke = reader.le_u32();
         }
         let instruction_set = parse_il_instructions(reader, size);
+
         MethodImpl {
             instruction: instruction_set
         }

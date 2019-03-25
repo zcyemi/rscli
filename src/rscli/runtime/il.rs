@@ -6,13 +6,15 @@ use std::intrinsics::transmute;
 #[derive(Copy, Clone, Debug)]
 pub enum OpCode {
     nop = 0x0,
+    ldarg_0 = 0x02,
+    ldarg_1 = 0x03,
+    add = 0x58,
     ldc_i4 = 0x20,
     stloc_0 = 0x0A,
     br_s = 0x2B,
     ldloc_0 = 0x06,
     ldloc_1 = 0x07,
     ret = 0x2A,
-    ldarg_0 = 0x02,
     call = 0x28,
 }
 
@@ -22,7 +24,7 @@ impl From<u8> for OpCode {
     }
 }
 
-#[derive(Debug,Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum OpData {
     none,
     int8(i8),
@@ -47,6 +49,13 @@ pub enum OpData {
     alignment,
 }
 
+impl OpData{
+
+    pub fn into_i32(self)->i32{
+        0_i32
+    }
+}
+
 #[derive(Debug)]
 pub struct Instruction {
     pub op: OpCode,
@@ -68,10 +77,12 @@ pub fn parse_il_instructions(reader: &mut BinaryReader, count: u32) -> Vec<Instr
             OpCode::ldloc_0 => Instruction { op, data: OpData::none },
             OpCode::ret => Instruction { op, data: OpData::none },
             OpCode::call => {
-                let (tag,tbl_ind) = reader.tag_index();
+                let (_tag, tbl_ind) = reader.tag_index();
                 Instruction { op, data: OpData::int32(tbl_ind as i32) }
-            },
+            }
             OpCode::ldarg_0 => Instruction { op, data: OpData::none },
+            OpCode::ldarg_1=> Instruction{op,data:OpData::none},
+            OpCode::add=>Instruction{op,data:OpData::none},
             _ => Instruction { op, data: OpData::none },
         };
         set.push(instruction);
