@@ -2,6 +2,8 @@
 
 use crate::rscli::util::reader::BinaryReader;
 use std::intrinsics::transmute;
+use std::mem::size_of;
+use std::fmt;
 
 #[derive(Copy, Clone, Debug)]
 pub enum OpCode {
@@ -24,42 +26,76 @@ impl From<u8> for OpCode {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
-pub enum OpData {
-    none,
-    int8(i8),
-    int16(i16),
-    int32(i32),
-    int64(i64),
-    unt8(i8),
-    unt16(u16),
-    unt32(u32),
-    unt64(u64),
-    float32(f32),
-    float64(f64),
 
+#[derive(Clone,Copy)]
+#[repr(C)]
+pub union Data {
+    pub i8: i8,
+    pub i16: i16,
+    pub i32: i32,
+    pub i64: i64,
+    pub u8: u8,
+    pub u16: u16,
+    pub u32: u32,
+    pub u64: u64,
+    pub f32: f32,
+    pub f64: f64,
+    pub bool: bool,
+    pub data_ref:DataRefType,
+}
+
+impl Data{
+    #[inline]
+    pub fn to_i8(&self)->i8{
+        unsafe {self.i8}
+    }
+    #[inline]
+    pub fn to_i16(&self)->i16{
+        unsafe {self.i16}
+    }
+    #[inline]
+    pub fn to_i32(&self)->i32{
+        unsafe {self.i32}
+    }
+    #[inline]
+    pub fn to_i64(&self)->i64{
+        unsafe {self.i64}
+    }
+}
+
+
+impl fmt::Debug for Data{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        const SIZE:usize = size_of::<Data>();
+        let ret:[u8;SIZE] = unsafe{ transmute::<&Self,[u8; SIZE]>(&self)};
+        write!(f,"{:?}",ret)
+    }
+}
+
+
+#[derive(Debug,Copy, Clone)]
+pub enum DataRefType{
+    none,
     type_token,
-    method,
     call_site_descr,
     class,
     this_type,
     field,
-    string,
     ctor,
-    alignment,
+    alignment
 }
 
-impl OpData{
-
-    pub fn into_i32(self)->i32{
-        0_i32
+impl Data {
+    #[inline]
+    pub const fn none() -> Data {
+        Data { data_ref:DataRefType::none }
     }
 }
 
 #[derive(Debug)]
 pub struct Instruction {
     pub op: OpCode,
-    pub data: OpData,
+    pub data: Data,
 }
 
 
@@ -70,20 +106,20 @@ pub fn parse_il_instructions(reader: &mut BinaryReader, count: u32) -> Vec<Instr
         let code = reader.le_u8();
         let op = OpCode::from(code);
         let instruction = match op {
-            OpCode::nop => Instruction { op, data: OpData::none },
-            OpCode::ldc_i4 => Instruction { op, data: OpData::int32(reader.le_i32()) },
-            OpCode::stloc_0 => Instruction { op, data: OpData::none },
-            OpCode::br_s => Instruction { op, data: OpData::int8(reader.le_i8()) },
-            OpCode::ldloc_0 => Instruction { op, data: OpData::none },
-            OpCode::ret => Instruction { op, data: OpData::none },
+            OpCode::nop => Instruction { op, data: Data::none() },
+            OpCode::ldc_i4 => Instruction { op, data: Data { i32: reader.le_i32() } },
+            OpCode::stloc_0 => Instruction { op, data: Data::none() },
+            OpCode::br_s => Instruction { op, data: Data { i8: reader.le_i8() } },
+            OpCode::ldloc_0 => Instruction { op, data: Data::none() },
+            OpCode::ret => Instruction { op, data: Data::none() },
             OpCode::call => {
                 let (_tag, tbl_ind) = reader.tag_index();
-                Instruction { op, data: OpData::int32(tbl_ind as i32) }
+                Instruction { op, data: Data { i32: tbl_ind as i32 } }
             }
-            OpCode::ldarg_0 => Instruction { op, data: OpData::none },
-            OpCode::ldarg_1=> Instruction{op,data:OpData::none},
-            OpCode::add=>Instruction{op,data:OpData::none},
-            _ => Instruction { op, data: OpData::none },
+            OpCode::ldarg_0 => Instruction { op, data: Data::none() },
+            OpCode::ldarg_1 => Instruction { op, data: Data::none() },
+            OpCode::add => Instruction { op, data: Data::none() },
+            _ => Instruction { op, data: Data::none() },
         };
         set.push(instruction);
     }

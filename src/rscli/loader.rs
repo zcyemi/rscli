@@ -2,8 +2,6 @@ use std::path::Path;
 use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
-use std::rc::Rc;
-use std::cell::RefCell;
 
 use crate::rscli::util::reader::BinaryReader;
 use crate::rscli::winpe::WinPe;
@@ -17,7 +15,7 @@ pub fn load_dll(file_path:&str)->DllFile{
     };
 
     let mut data = vec![];
-    let result = match file.read_to_end(&mut data) {
+    let _result = match file.read_to_end(&mut data) {
         Err(_e)=> panic!("read file failed: {}",_e.description()),
         Ok(size)=>{size},
     };

@@ -1,12 +1,7 @@
 #![allow(non_camel_case_types)]
 
-use std::rc::Rc;
-use std::cell::{RefCell, UnsafeCell};
-use crate::rscli::loader::DllFile;
 use crate::rscli::runtime::reflection::*;
-
 use crate::rscli::runtime::il::*;
-
 use std::mem::transmute;
 
 pub struct Context {
@@ -21,7 +16,7 @@ impl Context {
         }
     }
 
-    pub fn exec(&self, method_info: &MethodInfo,args:Option<Vec<OpData>>) -> Option<OpData> {
+    pub fn exec(&self, method_info: &MethodInfo,args:Option<Vec<Data>>) -> Option<Data> {
         let mut stack: ExecStack = Default::default();
 
         let inst = &method_info.instruction.borrow().instruction;
@@ -31,28 +26,28 @@ impl Context {
 
 #[derive(Debug)]
 pub struct ExecStack {
-    pub stack: Vec<OpData>,
-    pub local:[OpData;8],
+    pub stack: Vec<Data>,
+    pub local:[Data;8],
 }
 
 impl Default for ExecStack{
     fn default() -> Self {
         ExecStack{
             stack:Vec::new(),
-            local:[OpData::none;8],
+            local:[Data::none();8],
         }
     }
 }
 
 impl ExecStack {
-    pub fn exec(&mut self, instructions: &Vec<Instruction>,args:Option<Vec<OpData>>) -> Option<OpData> {
+    pub fn exec(&mut self, instructions: &Vec<Instruction>,args:Option<Vec<Data>>) -> Option<Data> {
         //TODO: need to check the args is match method parameters
 
         let il_count = instructions.len();
 
         let stack = &mut self.stack;
 
-        let mut ret = Option::None;
+        let mut ret:Option<Data> = None;
 
         let args = match  args {
             Some(v)=>v,
@@ -65,7 +60,7 @@ impl ExecStack {
             match op {
                 OpCode::nop => (),
                 OpCode::ldc_i4 => {
-                    stack.push(il.data.clone());
+                    stack.push(il.data);
                 }
                 OpCode::stloc_0=>{
                     let val = stack.pop().unwrap();
@@ -89,13 +84,16 @@ impl ExecStack {
                     stack.push(args[1]);
                 }
                 OpCode::add=>{
-                    //TODO: currently treat arguments as i32
-                    let a = stack.pop().unwrap();
-                    let b = stack.pop().unwrap();
+                    let a = stack.pop().unwrap().to_i32();
+                    let b = stack.pop().unwrap().to_i32();
+                    stack.push(Data{i32:a+b});
                 }
                 _ => (),
             }
         }
         ret
     }
+
+
+
 }

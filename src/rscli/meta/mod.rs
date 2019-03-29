@@ -3,13 +3,12 @@ use crate::rscli::util::reader::DataPointer;
 
 use crate::rscli::meta::tbl::CLIColumnType;
 use crate::rscli::meta::tbl::CLITableId;
-use crate::rscli::meta::tbl::CLIColumnMap;
+use crate::rscli::meta::tbl::CLICOLUMN_MAP;
 use crate::rscli::meta::tbl::*;
 
 use crate::rscli::util::BitUtility;
 
 use std::collections::HashMap;
-use std::iter::*;
 use std::rc::Rc;
 use crate::rscli::winpe::WinPe;
 
@@ -114,12 +113,12 @@ impl CLIHeader {
         header.metadata = reader.data_pointer();
         header.flags = reader.le_u32();
         header.entry_point_token = reader.le_u32();
-        let resources = reader.data_pointer();
+        let _resources = reader.data_pointer();
         header.strong_name_signature = reader.data_pointer();
-        let code_manager_tbl = reader.ate(8);
-        let vtable_fixups = reader.data_pointer();
-        let export_addr_tbl_jumps = reader.ate(8);
-        let managed_native_header = reader.ate(8);
+        let _code_manager_tbl = reader.ate(8);
+        let _vtable_fixups = reader.data_pointer();
+        let _export_addr_tbl_jumps = reader.ate(8);
+        let _managed_native_header = reader.ate(8);
         header
     }
 }
@@ -253,14 +252,14 @@ impl CLITildeStream {
     }
 
     fn calculate_table_data(&mut self) {
-        let table_count = self.rows.len();
+        let _table_count = self.rows.len();
         let mut table_rows: Vec<u32> = vec![0; 64];
         let rows = &self.rows;
         let mut table_map = CLITableId::map();
         table_map.sort();
         let valid = self.valid;
         let mut index: usize = 0;
-        for (t, &tableid) in table_map.iter().enumerate() {
+        for &tableid in table_map.iter() {
             if valid & (1 << tableid as u8) > 0 {
                 self.table_valid.push(tableid);
                 table_rows[tableid as usize] = rows[index];
@@ -270,7 +269,7 @@ impl CLITildeStream {
 
         //column rows
         let mut column_size: HashMap<CLIColumnType, u8> = HashMap::new();
-        let column_map = &CLIColumnMap;
+        let column_map = &CLICOLUMN_MAP;
         for (&column, table_vec) in column_map.iter() {
             let bit_count = (table_vec.len() as f32).log2().ceil() as u8;
             let mut tbl_max_row = 0_u32;

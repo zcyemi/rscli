@@ -1,7 +1,5 @@
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::hash::{Hash, Hasher};
-use std::marker::Sized;
 use std::rc::Rc;
 
 use crate::BinaryReader;
@@ -27,7 +25,7 @@ pub enum CLIColumnType {
 }
 
 lazy_static! {
-    pub static ref CLIColumnMap:HashMap<CLIColumnType,Vec<CLITableId>> = {
+    pub static ref CLICOLUMN_MAP:HashMap<CLIColumnType,Vec<CLITableId>> = {
         let mut m:HashMap<CLIColumnType,Vec<CLITableId>> = HashMap::new();
         m.insert(CLIColumnType::TypeDefOrRef,vec![
             CLITableId::TypeDef,
@@ -448,7 +446,7 @@ pub struct MetaMethodDef {
 impl MetaItem<MetaMethodDef> for MetaMethodDef {
     fn parse_table(reader: &mut BinaryReader, tilde_stream: &CLITildeStream, string_stream: &CLIStringStream) -> CLITable<MetaMethodDef> {
         let row = tilde_stream.get_table_row(CLITableId::MethodDef);
-        let heap_size = tilde_stream.heap_size;
+        let _heap_size = tilde_stream.heap_size;
         let mut data = Vec::new();
         for _ in 0..row {
             let rva = reader.le_u32();
@@ -624,7 +622,7 @@ pub struct MetaCustomAttribute {
 }
 
 impl MetaItem<MetaCustomAttribute> for MetaCustomAttribute {
-    fn parse_table(reader: &mut BinaryReader, tilde_stream: &CLITildeStream, string_stream: &CLIStringStream) -> CLITable<MetaCustomAttribute> {
+    fn parse_table(reader: &mut BinaryReader, tilde_stream: &CLITildeStream, _string_stream: &CLIStringStream) -> CLITable<MetaCustomAttribute> {
         let row = tilde_stream.get_table_row(CLITableId::CustomAttribute);
         let heap_size = tilde_stream.heap_size;
         let column_parent = tilde_stream.get_column_byte(CLIColumnType::HasCustomAttribute);
@@ -740,7 +738,7 @@ pub struct MetaStandAloneSig {
 }
 
 impl MetaItem<MetaStandAloneSig> for MetaStandAloneSig {
-    fn parse_table(reader: &mut BinaryReader, tilde_stream: &CLITildeStream, string_stream: &CLIStringStream) -> CLITable<MetaStandAloneSig> {
+    fn parse_table(reader: &mut BinaryReader, tilde_stream: &CLITildeStream, _string_stream: &CLIStringStream) -> CLITable<MetaStandAloneSig> {
         let row = tilde_stream.get_table_row(CLITableId::StandAloneSig);
         let heap_size = tilde_stream.heap_size;
         let mut data = Vec::new();

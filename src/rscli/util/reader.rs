@@ -161,7 +161,7 @@ impl<'a> BinaryReader<'a> {
 
         let ret:&str = match str::from_utf8(ret) {
             Ok(v)=>{v},
-            Err(e)=>panic!("parse string failed"),
+            Err(_)=>panic!("parse string failed"),
         };
         String::from(ret)
     }

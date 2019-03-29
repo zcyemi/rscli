@@ -1,13 +1,8 @@
 use std::rc::Rc;
 use std::cell::RefCell;
 use crate::rscli::loader::DllFile;
-use crate::rscli::meta::CLIData;
 use crate::rscli::meta::tbl::*;
-use std::fs::{OpenOptions, read};
-use crate::rscli::meta::tbl::CLITableId::TypeDef;
-use core::borrow::BorrowMut;
 use crate::rscli::util::reader::BinaryReader;
-use std::net::Shutdown::Read;
 use crate::rscli::runtime::il::{parse_il_instructions, Instruction};
 
 
@@ -71,15 +66,15 @@ impl ReflectionInfo {
             let method_list_start = typedef.method_list as usize - 1;
             let total_rows = tbl_typedef.row as usize;
 
-            let mut method_list_end = method_list_start;
+            let mut _method_list_end = method_list_start;
             if index == total_rows - 1 {
-                method_list_end = clidata.tbl_methoddef.row as usize;
+                _method_list_end = clidata.tbl_methoddef.row as usize;
             } else {
                 let next_typedef = tbl_typedef.get_data_by_index(index + 1);
-                method_list_end = next_typedef.method_list as usize;
+                _method_list_end = next_typedef.method_list as usize;
             }
 
-            let methods = self.get_method_info_by_index_range(method_list_start, method_list_end);
+            let methods = self.get_method_info_by_index_range(method_list_start, _method_list_end);
             for item in &methods {
                 self.info_method.push(Rc::clone(&item));
             }
@@ -192,16 +187,16 @@ impl MethodImpl {
         reader.seek(rva);
         let flag = reader.le_u8();
         let thin_mode = (flag & 0b11) == 0b10;
-        let mut size = 0_u32;
+        let mut _size = 0_u32;
         if thin_mode {
-            size = (flag >> 2) as u32;
+            _size = (flag >> 2) as u32;
         } else {
             reader.le_u8();
             let _max_stack = reader.le_u16();
-            size = reader.le_u32();
+            _size = reader.le_u32();
             let _local_var_sig_toke = reader.le_u32();
         }
-        let instruction_set = parse_il_instructions(reader, size);
+        let instruction_set = parse_il_instructions(reader, _size);
 
         MethodImpl {
             instruction: instruction_set
