@@ -1,5 +1,3 @@
-pub mod reader;
-
 pub struct BitUtility {}
 
 impl BitUtility {

@@ -1,4 +1,5 @@
-use crate::rscli::util::reader::BinaryReader;
+
+use crate::reader::*;
 
 #[derive(Debug)]
 pub struct WinPe{

@@ -1,9 +1,10 @@
 #![allow(non_camel_case_types)]
 
-use crate::rscli::util::reader::BinaryReader;
 use std::intrinsics::transmute;
 use std::mem::size_of;
 use std::fmt;
+
+use crate::reader::BinaryReader;
 
 #[derive(Copy, Clone, Debug)]
 pub enum OpCode {

@@ -2,9 +2,8 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::BinaryReader;
-use crate::rscli::meta::CLITildeStream;
-use crate::rscli::meta::CLIStringStream;
+use crate::reader::*;
+use crate::meta::*;
 
 
 #[derive(Eq, Debug, PartialEq, Hash, Copy, Clone)]

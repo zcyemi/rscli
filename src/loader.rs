@@ -3,9 +3,9 @@ use std::error::Error;
 use std::fs::File;
 use std::io::prelude::*;
 
-use crate::rscli::util::reader::BinaryReader;
-use crate::rscli::winpe::WinPe;
-use crate::rscli::meta::CLIData;
+use crate::meta::*;
+use crate::reader::*;
+use crate::winpe::WinPe;
 
 pub fn load_dll(file_path:&str)->DllFile{
     let path = Path::new(file_path);
@@ -33,6 +33,7 @@ impl DllFile{
 
         let reader = &mut BinaryReader::new(&dat);
         reader.seek(0);
+
 
         let pe = WinPe::parse_winpe(reader);
         reader.ate(16);

@@ -1,10 +1,10 @@
 use std::rc::Rc;
 use std::cell::RefCell;
-use crate::rscli::loader::DllFile;
-use crate::rscli::meta::tbl::*;
-use crate::rscli::util::reader::BinaryReader;
-use crate::rscli::runtime::il::{parse_il_instructions, Instruction};
 
+use crate::il::*;
+use crate::loader::*;
+use crate::reader::BinaryReader;
+use crate::tbl::*;
 
 #[derive(Default,Debug)]
 pub struct ReflectionInfo {
@@ -22,15 +22,6 @@ impl ReflectionInfo {
 
 
     pub fn load_dll(&mut self, dll: &Rc<RefCell<DllFile>>) {
-        //process dll
-//        let mut data = &dll.as_ref().borrow_mut().clidata;
-//        let filter = |x: &MetaAssembly| x.name.as_ref() == "netdlltest";
-
-//        let asm: Option<AssemblyInfo> = data.tbl_assembly.create_runtime_type_by_filter(&filter);
-//        match asm {
-//            Some(info) => self.info_assembly.push(info),
-//            None => (),
-//        }
         self.dll = Rc::clone(dll);
     }
 

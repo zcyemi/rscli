@@ -1,19 +1,10 @@
-use crate::rscli::util::reader::BinaryReader;
-use crate::rscli::util::reader::DataPointer;
-
-use crate::rscli::meta::tbl::CLIColumnType;
-use crate::rscli::meta::tbl::CLITableId;
-use crate::rscli::meta::tbl::CLICOLUMN_MAP;
-use crate::rscli::meta::tbl::*;
-
-use crate::rscli::util::BitUtility;
-
 use std::collections::HashMap;
 use std::rc::Rc;
-use crate::rscli::winpe::WinPe;
 
-pub mod tbl;
-
+use crate::tbl::*;
+use crate::util::*;
+use crate::reader::*;
+use crate::winpe::WinPe;
 
 #[derive(Default, Debug)]
 pub struct CLIData {
@@ -291,11 +282,11 @@ impl CLITildeStream {
         self.column_size = column_size;
     }
 
-    fn get_table_row(self: &Self, table_id: CLITableId) -> u32 {
+    pub fn get_table_row(self: &Self, table_id: CLITableId) -> u32 {
         self.table_rows[table_id as usize]
     }
 
-    fn get_column_byte(self: &Self, column: CLIColumnType) -> u8 {
+    pub fn get_column_byte(self: &Self, column: CLIColumnType) -> u8 {
         self.column_size[&column]
     }
 }

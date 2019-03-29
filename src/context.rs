@@ -1,8 +1,9 @@
 #![allow(non_camel_case_types)]
 
-use crate::rscli::runtime::reflection::*;
-use crate::rscli::runtime::il::*;
 use std::mem::transmute;
+
+use crate::il::*;
+use crate::reflection::*;
 
 pub struct Context {
     pub reflection: ReflectionInfo,
@@ -40,6 +41,7 @@ impl Default for ExecStack{
 }
 
 impl ExecStack {
+    #[allow(unused_assignments)]
     pub fn exec(&mut self, instructions: &Vec<Instruction>,args:Option<Vec<Data>>) -> Option<Data> {
         //TODO: need to check the args is match method parameters
 
