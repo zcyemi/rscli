@@ -100,9 +100,11 @@ pub struct Instruction {
 }
 
 
-pub fn parse_il_instructions(reader: &mut BinaryReader, count: u32) -> Vec<Instruction> {
+pub fn parse_il_instructions(reader: &mut BinaryReader, count: u32) -> ( Vec<Instruction>,u8) {
     let mut set = Vec::new();
     let pos_max = reader.pos + count as usize;
+
+    let mut param_list_len:u8 = 0;
     while reader.pos < pos_max {
         let code = reader.le_u8();
         let op = OpCode::from(code);
@@ -117,12 +119,18 @@ pub fn parse_il_instructions(reader: &mut BinaryReader, count: u32) -> Vec<Instr
                 let (_tag, tbl_ind) = reader.tag_index();
                 Instruction { op, data: Data { i32: tbl_ind as i32 } }
             }
-            OpCode::ldarg_0 => Instruction { op, data: Data::none() },
-            OpCode::ldarg_1 => Instruction { op, data: Data::none() },
+            OpCode::ldarg_0 =>{
+                param_list_len = 1;
+                Instruction { op, data: Data::none() }
+            },
+            OpCode::ldarg_1 => {
+                param_list_len = 2;
+                Instruction { op, data: Data::none() }
+            },
             OpCode::add => Instruction { op, data: Data::none() },
             _ => Instruction { op, data: Data::none() },
         };
         set.push(instruction);
     }
-    set
+    (set,param_list_len)
 }

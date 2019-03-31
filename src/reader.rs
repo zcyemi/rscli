@@ -239,9 +239,13 @@ impl<'a> BinaryReader<'a> {
             panic!("can not read tags: {:?}", tags);
         }
     }
-
+    #[inline]
     pub fn seek(self: &mut Self, pos: usize) {
         (*self).pos = pos;
+    }
+    #[inline]
+    pub fn offset(self:&mut Self,off:usize){
+        (*self).pos += off;
     }
 
     pub fn repeat<T>(&mut self, f: fn(&mut Self) -> T, count: u32) -> Vec<T> {

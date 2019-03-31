@@ -5,6 +5,7 @@ use crate::tbl::*;
 use crate::util::*;
 use crate::reader::*;
 use crate::winpe::WinPe;
+use std::path::Prefix::Verbatim;
 
 #[derive(Default, Debug)]
 pub struct CLIData {
@@ -15,6 +16,7 @@ pub struct CLIData {
     pub addr_offset_code: usize,
 
     pub string_stream: CLIStringStream,
+    pub blob_stream:CLIBlobStream,
 
     pub tbl_module: CLITable<MetaModule>,
     pub tbl_typeref: CLITable<MetaTypeRef>,
@@ -36,18 +38,24 @@ impl CLIData {
         let meta = CLIMetaData::parse(reader);
         clidata.tilde_stream = CLITildeStream::parse(reader);
 
+
         let meta_base_addr = meta.meta_pos;
 
-        let (str_off, str_size) = meta.get_stream_rva("#Strings");
+        let (str_off, str_size) = meta.get_stream_rva(&"#Strings");
         let str_start = meta_base_addr + str_off;
         let str_end = str_start + str_size;
         let string_stream = CLIStringStream::parse(reader, (str_start, str_end));
 
+        let (blob_off, blob_size) = meta.get_stream_rva(&"#Blob");
+        let blob_start = meta_base_addr + blob_off;
+        let blob_end = blob_start + blob_size;
+        let blob_stream = CLIBlobStream::parse(reader,(blob_start,blob_end));
+
         clidata.string_stream = string_stream;
         clidata.addr_offset_code = (pe.base_of_code - 0x200) as usize;
+        clidata.blob_stream = blob_stream;
 
         clidata.parse_tables(reader);
-
 
         clidata.meta = meta;
         clidata
@@ -288,6 +296,57 @@ impl CLITildeStream {
 
     pub fn get_column_byte(self: &Self, column: CLIColumnType) -> u8 {
         self.column_size[&column]
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct CLIBlobStream {
+    pub base_addr: usize,
+    pub index_map: Vec<usize>,
+    pub blob_len:usize,
+}
+
+impl CLIBlobStream {
+    pub fn parse(reader: &mut BinaryReader, stream_info: (usize, usize)) -> CLIBlobStream {
+        let start_addr = stream_info.0;
+        let prev_pos = reader.pos;
+        let max_addr = stream_info.1;
+
+        reader.seek(start_addr + 1);
+
+        reader.tag(&[0x0]);
+
+        let mut index_map: Vec<usize> = Vec::new();
+
+        while reader.pos < max_addr {
+            let leading_byte = reader.le_u8();
+            index_map.push(reader.pos - 1);
+            if leading_byte >> 7 == 0 {
+                let len = leading_byte & 0b01111111;
+                reader.offset(len as usize);
+            } else if leading_byte >> 6 == 0b10 {
+                let next_byte = reader.le_u8();
+                let len: usize = ((leading_byte & 0b00111111) as usize) << 8 + next_byte as usize;
+                reader.offset(len);
+            } else if leading_byte >> 5 == 0b110 {
+                let mut len: usize = ((leading_byte & 0b00011111) as usize) << 24;
+                len += (reader.le_u8() as usize) << 16;
+                len += (reader.le_u8() as usize) << 8;
+                len += (reader.le_u8() as usize);
+                reader.offset(len);
+            } else {
+                panic!("invalid blob stream");
+            }
+        }
+
+        println!("blob stream {:?}", index_map);
+        reader.seek(prev_pos);
+
+        CLIBlobStream {
+            base_addr: start_addr,
+            blob_len: index_map.len(),
+            index_map: index_map,
+        }
     }
 }
 

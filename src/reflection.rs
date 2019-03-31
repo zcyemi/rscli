@@ -6,7 +6,7 @@ use crate::loader::*;
 use crate::reader::BinaryReader;
 use crate::tbl::*;
 
-#[derive(Default,Debug)]
+#[derive(Default, Debug)]
 pub struct ReflectionInfo {
     dll: Rc<RefCell<DllFile>>,
 
@@ -70,7 +70,6 @@ impl ReflectionInfo {
                 self.info_method.push(Rc::clone(&item));
             }
             let class_info = ClassInfo::new(&typedef, index, methods);
-
 
 
             let rc = Rc::new(class_info);
@@ -170,6 +169,7 @@ impl MethodInfo {
 #[derive(Debug, Default)]
 pub struct MethodImpl {
     pub instruction: Vec<Instruction>,
+    pub param_list_len: u8,
 
 }
 
@@ -187,10 +187,15 @@ impl MethodImpl {
             _size = reader.le_u32();
             let _local_var_sig_toke = reader.le_u32();
         }
-        let instruction_set = parse_il_instructions(reader, _size);
+        let (instruction_set, param_len) = parse_il_instructions(reader, _size);
 
         MethodImpl {
-            instruction: instruction_set
+            instruction: instruction_set,
+            param_list_len: param_len,
         }
     }
+}
+
+pub struct ParamInfo{
+    pub name:Rc<String>,
 }
