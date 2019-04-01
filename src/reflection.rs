@@ -5,6 +5,8 @@ use crate::il::*;
 use crate::loader::*;
 use crate::reader::BinaryReader;
 use crate::tbl::*;
+use crate::meta::MethodDefSig;
+use crate::tbl::CLITableId::MethodDef;
 
 #[derive(Default, Debug)]
 pub struct ReflectionInfo {
@@ -86,9 +88,13 @@ impl ReflectionInfo {
 
         let mut reader = BinaryReader::new(&dll.data);
 
-
         for ind in start..end {
             let method = tbl_method.get_data_by_index(ind);
+
+            //let method_sig:MethodDefSig = clidata.parse_signature(&mut reader,method.signature as usize);
+
+            println!("{} {}", &method.signature, &method.name);
+
             let addr = clidata.get_rva_addr(method.rva as usize);
             let method_impl = MethodImpl::parse(&mut reader, addr);
             let method_info = MethodInfo::new(method, ind, method_impl);

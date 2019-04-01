@@ -130,6 +130,7 @@ impl<'a> BinaryReader<'a> {
         ret
     }
 
+
     pub fn ate_till_byte(&mut self, byte: u8) -> usize {
         let mut pos = self.pos;
         let dat = self.raw_data;

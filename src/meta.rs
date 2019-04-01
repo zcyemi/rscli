@@ -5,7 +5,7 @@ use crate::tbl::*;
 use crate::util::*;
 use crate::reader::*;
 use crate::winpe::WinPe;
-use std::path::Prefix::Verbatim;
+use crate::tbl::CLITableId::ExportedType;
 
 #[derive(Default, Debug)]
 pub struct CLIData {
@@ -76,9 +76,39 @@ impl CLIData {
 //        println!("module end{:#x}",reader.pos);
     }
 
+    #[inline]
     pub fn get_rva_addr(&self, rva: usize) -> usize {
         rva - self.addr_offset_code
     }
+
+    #[inline]
+    pub fn parse_signature<T:Signature<T>>(&self,reader:&mut BinaryReader,blob_offset:usize)->T{
+        let address = self.blob_stream.base_addr + blob_offset;
+
+        //calculate byte length
+        reader.seek(address);
+        let leading_byte = reader.le_u8();
+
+        let mut len:usize = 0;
+        if leading_byte >> 7 == 0 {
+            len = (leading_byte & 0b01111111) as usize;
+
+        } else if leading_byte >> 6 == 0b10 {
+            let next_byte = reader.le_u8();
+            len = ((leading_byte & 0b00111111) as usize) << 8 + next_byte as usize;
+        } else if leading_byte >> 5 == 0b110 {
+            let mut len: usize = ((leading_byte & 0b00011111) as usize) << 24;
+            len += (reader.le_u8() as usize) << 16;
+            len += (reader.le_u8() as usize) << 8;
+            len += (reader.le_u8() as usize);
+        } else {
+            panic!(write!("invalid blob stream at addr: {}",address));
+        }
+
+        reader.offset(len);
+        T::parse_signature(reader,len)
+    }
+
 }
 
 #[derive(Debug, Default)]
@@ -301,7 +331,7 @@ impl CLITildeStream {
 
 #[derive(Debug, Default)]
 pub struct CLIBlobStream {
-    pub base_addr: usize,
+    pub base_addr: usize, // alread contains the leading byte 0x
     pub index_map: Vec<usize>,
     pub blob_len:usize,
 }
@@ -343,7 +373,7 @@ impl CLIBlobStream {
         reader.seek(prev_pos);
 
         CLIBlobStream {
-            base_addr: start_addr,
+            base_addr: start_addr+1,
             blob_len: index_map.len(),
             index_map: index_map,
         }
@@ -401,5 +431,126 @@ impl CLIStringStream {
             Rc::clone(&self.data[*index as usize])
         };
         val
+    }
+}
+
+
+pub trait Signature<T>{
+    fn parse_signature(reader:&mut BinaryReader,length:usize)->T;
+}
+
+pub enum CallingConvention{
+    Mask = 0x700,
+    PlatformAPI = 0x100,
+    Cdecl = 0x200,
+    StdCall = 0x300,
+    ThisCall = 0x400,
+    FastCall = 0x500,
+}
+
+
+
+pub enum MethodImplFlags{
+    CodeTypeMask = 0x3,
+    IL = 0x0,
+    Native = 0x1,
+    OPTIL = 0x2,
+    Runtime = 0x3,
+}
+
+pub struct CustomMod{
+
+}
+
+pub struct RetType{
+    pub custom_mod:bool,
+    pub by_ref:bool,
+    pub typed:ElementType,
+    pub is_void:bool
+}
+
+pub struct Param{
+    pub custom_mod:bool,
+    pub by_ref:bool,
+    pub typed:ElementType,
+}
+
+pub enum ElementType{
+    End = 0x00,
+    Void = 0x01,
+    Boolean = 0x02,
+    Char = 0x03,
+    I1 = 0x04,
+    U1 = 0x05,
+    I2 = 0x06,
+    U2 = 0x07,
+    I4 = 0x08,
+    U4 = 0x09,
+    I8 = 0x0a,
+    U8 = 0x0b,
+    F32 = 0x0c,
+    F64 = 0x0d,
+    String = 0x0e,
+    Ptr = 0x0f,
+    ByRef = 0x10,
+    ValueType = 0x11,
+    Class = 0x12,
+    Var = 0x13,
+    Array = 0x14,
+    GenericInst = 0x15,
+    TypedByRef = 0x16,
+    IntPtr = 0x18,
+    UIntPtr = 0x19,
+    FNPTR = 0x1b,
+    Object = 0x1c,
+    SZAarray = 0x1d,
+    Mvar = 0x1e,
+    CMOD_REQD = 0x1f,
+    CMOD_OPT = 0x20,
+    Internal = 0x21,
+    Modifier = 0x40,
+    Sentinel = 0x41,
+    Pinned= 0x45,
+}
+
+pub enum MethodDefSigType{
+    Default = 0x0,
+    VarArg = 0x5,
+    Generic = 0x10,
+}
+
+
+pub struct MethodDefSig{
+    pub has_this:bool,
+    pub explicit_this:bool,
+    pub def_type:MethodDefSig,
+    pub param_count:u8,
+    pub ret_type:u8,
+    pub params:Vec<u8>,
+
+}
+
+
+impl Signature<MethodDefSig> for MethodDefSig{
+
+    fn parse_signature(reader:&mut BinaryReader,length:usize) -> MethodDefSig {
+        let mut byte = reader.le_u8();
+        let mut has_this = false;
+        if byte == 0x20{
+            has_this = true;
+            byte = reader.le_u8();
+        }
+        let mut explicit_this = false;
+        if byte == 0x40{
+            explicit_this = true;
+            byte = reader.le_u8();
+        }
+
+        let def_type = byte as MethodDefSigType;
+        let param_count = reader.le_u8();
+
+
+
+        panic!("");
     }
 }
