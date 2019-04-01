@@ -5,7 +5,6 @@ use crate::tbl::*;
 use crate::util::*;
 use crate::reader::*;
 use crate::winpe::WinPe;
-use crate::tbl::CLITableId::ExportedType;
 
 #[derive(Default, Debug)]
 pub struct CLIData {
@@ -16,7 +15,7 @@ pub struct CLIData {
     pub addr_offset_code: usize,
 
     pub string_stream: CLIStringStream,
-    pub blob_stream:CLIBlobStream,
+    pub blob_base_addr: usize,
 
     pub tbl_module: CLITable<MetaModule>,
     pub tbl_typeref: CLITable<MetaTypeRef>,
@@ -48,12 +47,11 @@ impl CLIData {
 
         let (blob_off, blob_size) = meta.get_stream_rva(&"#Blob");
         let blob_start = meta_base_addr + blob_off;
-        let blob_end = blob_start + blob_size;
-        let blob_stream = CLIBlobStream::parse(reader,(blob_start,blob_end));
+        let _blob_end = blob_start + blob_size;
+        clidata.blob_base_addr = blob_start;
 
         clidata.string_stream = string_stream;
         clidata.addr_offset_code = (pe.base_of_code - 0x200) as usize;
-        clidata.blob_stream = blob_stream;
 
         clidata.parse_tables(reader);
 
@@ -82,33 +80,32 @@ impl CLIData {
     }
 
     #[inline]
-    pub fn parse_signature<T:Signature<T>>(&self,reader:&mut BinaryReader,blob_offset:usize)->T{
-        let address = self.blob_stream.base_addr + blob_offset;
+    pub fn parse_signature<T: Signature<T>>(&self, reader: &mut BinaryReader, blob_offset: usize) -> T {
+        let address = self.blob_base_addr + blob_offset;
 
         //calculate byte length
         reader.seek(address);
         let leading_byte = reader.le_u8();
 
-        let mut len:usize = 0;
-        if leading_byte >> 7 == 0 {
-            len = (leading_byte & 0b01111111) as usize;
 
+        let mut _len: usize = 0;
+        if leading_byte >> 7 == 0 {
+            _len = (leading_byte & 0b01111111) as usize;
         } else if leading_byte >> 6 == 0b10 {
             let next_byte = reader.le_u8();
-            len = ((leading_byte & 0b00111111) as usize) << 8 + next_byte as usize;
+            _len = ((leading_byte & 0b00111111) as usize) << 8 + next_byte as usize;
         } else if leading_byte >> 5 == 0b110 {
-            let mut len: usize = ((leading_byte & 0b00011111) as usize) << 24;
-            len += (reader.le_u8() as usize) << 16;
-            len += (reader.le_u8() as usize) << 8;
-            len += (reader.le_u8() as usize);
+            _len = ((leading_byte & 0b00011111) as usize) << 24;
+            _len += (reader.le_u8() as usize) << 16;
+            _len += (reader.le_u8() as usize) << 8;
+            _len += reader.le_u8() as usize;
         } else {
-            panic!(write!("invalid blob stream at addr: {}",address));
+            panic!("invalid blob stream at addr: {}", &address);
         }
 
-        reader.offset(len);
-        T::parse_signature(reader,len)
+        assert_ne!(_len, 0_usize);
+        T::parse_signature(reader, _len)
     }
-
 }
 
 #[derive(Debug, Default)]
@@ -330,57 +327,6 @@ impl CLITildeStream {
 }
 
 #[derive(Debug, Default)]
-pub struct CLIBlobStream {
-    pub base_addr: usize, // alread contains the leading byte 0x
-    pub index_map: Vec<usize>,
-    pub blob_len:usize,
-}
-
-impl CLIBlobStream {
-    pub fn parse(reader: &mut BinaryReader, stream_info: (usize, usize)) -> CLIBlobStream {
-        let start_addr = stream_info.0;
-        let prev_pos = reader.pos;
-        let max_addr = stream_info.1;
-
-        reader.seek(start_addr + 1);
-
-        reader.tag(&[0x0]);
-
-        let mut index_map: Vec<usize> = Vec::new();
-
-        while reader.pos < max_addr {
-            let leading_byte = reader.le_u8();
-            index_map.push(reader.pos - 1);
-            if leading_byte >> 7 == 0 {
-                let len = leading_byte & 0b01111111;
-                reader.offset(len as usize);
-            } else if leading_byte >> 6 == 0b10 {
-                let next_byte = reader.le_u8();
-                let len: usize = ((leading_byte & 0b00111111) as usize) << 8 + next_byte as usize;
-                reader.offset(len);
-            } else if leading_byte >> 5 == 0b110 {
-                let mut len: usize = ((leading_byte & 0b00011111) as usize) << 24;
-                len += (reader.le_u8() as usize) << 16;
-                len += (reader.le_u8() as usize) << 8;
-                len += (reader.le_u8() as usize);
-                reader.offset(len);
-            } else {
-                panic!("invalid blob stream");
-            }
-        }
-
-        println!("blob stream {:?}", index_map);
-        reader.seek(prev_pos);
-
-        CLIBlobStream {
-            base_addr: start_addr+1,
-            blob_len: index_map.len(),
-            index_map: index_map,
-        }
-    }
-}
-
-#[derive(Debug, Default)]
 pub struct CLIStringStream {
     pub data: Vec<Rc<String>>,
     pub index_map: HashMap<u32, u32>,
@@ -435,11 +381,13 @@ impl CLIStringStream {
 }
 
 
-pub trait Signature<T>{
-    fn parse_signature(reader:&mut BinaryReader,length:usize)->T;
+pub trait Signature<T> {
+    fn parse_signature(reader: &mut BinaryReader, length: usize) -> T;
 }
 
-pub enum CallingConvention{
+
+#[derive(Debug, Copy, Clone)]
+pub enum CallingConvention {
     Mask = 0x700,
     PlatformAPI = 0x100,
     Cdecl = 0x200,
@@ -449,33 +397,98 @@ pub enum CallingConvention{
 }
 
 
-
-pub enum MethodImplFlags{
-    CodeTypeMask = 0x3,
+#[derive(Debug, Copy, Clone)]
+pub enum MethodImplFlags {
     IL = 0x0,
     Native = 0x1,
     OPTIL = 0x2,
     Runtime = 0x3,
 }
 
-pub struct CustomMod{
 
+#[derive(Debug)]
+pub struct RetType {
+    pub custom_mod: bool,
+    pub by_ref: bool,
+    pub typed: ElementType,
 }
 
-pub struct RetType{
-    pub custom_mod:bool,
-    pub by_ref:bool,
-    pub typed:ElementType,
-    pub is_void:bool
+impl Signature<RetType> for RetType {
+    fn parse_signature(reader: &mut BinaryReader, _length: usize) -> RetType {
+        let mut byte = reader.le_u8();
+        let mut custom_mod = false;
+        if byte == (ElementType::CMOD_REQD as u8) {
+            custom_mod = true;
+            byte = reader.le_u8();
+        }
+
+        let mut by_ref = false;
+        let typed: ElementType;
+        if byte == (ElementType::Void as u8) {
+            typed = ElementType::Void;
+        } else if byte == (ElementType::ByRef as u8) {
+            byte = reader.le_u8();
+            typed = ElementType::from(byte);
+            by_ref = true;
+        } else if byte == (ElementType::TypedByRef as u8) {
+//            byte = reader.le_u8();
+            unimplemented!("parse typed by ref not implemented!");
+        } else {
+            typed = ElementType::from(byte);
+        }
+
+        RetType {
+            custom_mod,
+            by_ref,
+            typed,
+        }
+    }
 }
 
-pub struct Param{
-    pub custom_mod:bool,
-    pub by_ref:bool,
-    pub typed:ElementType,
+#[derive(Debug)]
+pub struct Param {
+    pub custom_mod: bool,
+    pub by_ref: bool,
+    pub typed: ElementType,
+    pub type_ind: usize,
 }
 
-pub enum ElementType{
+impl Signature<Param> for Param {
+    fn parse_signature(reader: &mut BinaryReader, _length: usize) -> Param {
+        let mut byte = reader.le_u8();
+
+        let mut custom_mod = false;
+        if byte == (ElementType::CMOD_REQD as u8) { //TODO
+            custom_mod = true;
+            byte = reader.le_u8();
+        }
+
+        let mut by_ref = false;
+
+        let typed;
+        let type_ind = 0_usize;
+        if byte == (ElementType::ByRef as u8) {
+            by_ref = true;
+            byte = reader.le_u8();
+            typed = ElementType::from(byte);
+        } else if byte == (ElementType::TypedByRef as u8) {
+            unimplemented!("parse typed by ref not implemented!");
+        } else {
+            typed = ElementType::from(byte);
+        }
+        Param {
+            custom_mod,
+            by_ref,
+            typed,
+            type_ind,
+        }
+    }
+}
+
+
+#[derive(Copy, Clone, Debug)]
+#[allow(non_camel_case_types)]
+pub enum ElementType {
     End = 0x00,
     Void = 0x01,
     Boolean = 0x02,
@@ -510,47 +523,121 @@ pub enum ElementType{
     Internal = 0x21,
     Modifier = 0x40,
     Sentinel = 0x41,
-    Pinned= 0x45,
+    Pinned = 0x45,
 }
 
-pub enum MethodDefSigType{
+impl From<&ElementType> for u8 {
+    fn from(e: &ElementType) -> Self {
+        *e as u8
+    }
+}
+
+
+impl From<u8> for ElementType {
+    fn from(v: u8) -> Self {
+        match v {
+            0x00 => ElementType::End,
+            0x01 => ElementType::Void,
+            0x02 => ElementType::Boolean,
+            0x03 => ElementType::Char,
+            0x04 => ElementType::I1,
+            0x05 => ElementType::U1,
+            0x06 => ElementType::I2,
+            0x07 => ElementType::U2,
+            0x08 => ElementType::I4,
+            0x09 => ElementType::U4,
+            0x0a => ElementType::I8,
+            0x0b => ElementType::U8,
+            0x0c => ElementType::F32,
+            0x0d => ElementType::F64,
+            0x0e => ElementType::String,
+            0x0f => ElementType::Ptr,
+            0x10 => ElementType::ByRef,
+            0x11 => ElementType::ValueType,
+            0x12 => ElementType::Class,
+            0x13 => ElementType::Var,
+            0x14 => ElementType::Array,
+            0x15 => ElementType::GenericInst,
+            0x16 => ElementType::TypedByRef,
+            0x18 => ElementType::IntPtr,
+            0x19 => ElementType::UIntPtr,
+            0x1b => ElementType::FNPTR,
+            0x1c => ElementType::Object,
+            0x1d => ElementType::SZAarray,
+            0x1e => ElementType::Mvar,
+            0x1f => ElementType::CMOD_REQD,
+            0x20 => ElementType::CMOD_OPT,
+            0x21 => ElementType::Internal,
+            0x40 => ElementType::Modifier,
+            0x41 => ElementType::Sentinel,
+            0x45 => ElementType::Pinned,
+            _ => panic!("not implement convert"),
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum MethodDefSigType {
     Default = 0x0,
     VarArg = 0x5,
     Generic = 0x10,
 }
 
+impl From<u8> for MethodDefSigType {
+    fn from(v: u8) -> Self {
+        match v {
+            0x0 => MethodDefSigType::Default,
+            0x5 => MethodDefSigType::VarArg,
+            0x10 => MethodDefSigType::Generic,
+            _ => panic!("invalid value for MethodDefSigType")
+        }
+    }
+}
 
-pub struct MethodDefSig{
-    pub has_this:bool,
-    pub explicit_this:bool,
-    pub def_type:MethodDefSig,
-    pub param_count:u8,
-    pub ret_type:u8,
-    pub params:Vec<u8>,
+
+#[derive(Debug)]
+pub struct MethodDefSig {
+    pub has_this: bool,
+    pub explicit_this: bool,
+    pub def_type: MethodDefSigType,
+    pub param_count: u8,
+    pub ret_type: RetType,
+    pub params: Vec<Param>,
 
 }
 
 
-impl Signature<MethodDefSig> for MethodDefSig{
-
-    fn parse_signature(reader:&mut BinaryReader,length:usize) -> MethodDefSig {
+impl Signature<MethodDefSig> for MethodDefSig {
+    fn parse_signature(reader: &mut BinaryReader, _length: usize) -> MethodDefSig {
         let mut byte = reader.le_u8();
         let mut has_this = false;
-        if byte == 0x20{
+        if byte == 0x20 {
             has_this = true;
             byte = reader.le_u8();
         }
         let mut explicit_this = false;
-        if byte == 0x40{
+        if byte == 0x40 {
             explicit_this = true;
             byte = reader.le_u8();
         }
 
-        let def_type = byte as MethodDefSigType;
+        let def_type = MethodDefSigType::from(byte);
         let param_count = reader.le_u8();
 
+        let ret_type = RetType::parse_signature(reader, 0);
 
+        let mut params = Vec::new();
+        for _ in 0..param_count {
+            params.push(Param::parse_signature(reader, 0));
+        }
 
-        panic!("");
+        MethodDefSig {
+            has_this,
+            explicit_this,
+            def_type,
+            param_count,
+            ret_type,
+            params,
+        }
     }
 }

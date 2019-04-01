@@ -6,7 +6,6 @@ use crate::loader::*;
 use crate::reader::BinaryReader;
 use crate::tbl::*;
 use crate::meta::MethodDefSig;
-use crate::tbl::CLITableId::MethodDef;
 
 #[derive(Default, Debug)]
 pub struct ReflectionInfo {
@@ -90,14 +89,10 @@ impl ReflectionInfo {
 
         for ind in start..end {
             let method = tbl_method.get_data_by_index(ind);
-
-            //let method_sig:MethodDefSig = clidata.parse_signature(&mut reader,method.signature as usize);
-
-            println!("{} {}", &method.signature, &method.name);
-
+            let method_sig: MethodDefSig = clidata.parse_signature(&mut reader, method.signature as usize);
             let addr = clidata.get_rva_addr(method.rva as usize);
             let method_impl = MethodImpl::parse(&mut reader, addr);
-            let method_info = MethodInfo::new(method, ind, method_impl);
+            let method_info = MethodInfo::new(method, ind, method_impl, method_sig);
             let rc = Rc::new(method_info);
             vec.push(rc);
         }
@@ -156,16 +151,17 @@ impl ClassInfo {
 pub struct MethodInfo {
     pub name: Rc<String>,
     pub meta_index: usize,
-
+    pub signature: MethodDefSig,
     pub rva: usize,
     pub instruction: RefCell<MethodImpl>,
 }
 
 impl MethodInfo {
-    pub fn new(meta: &MetaMethodDef, index: usize, method_impl: MethodImpl) -> MethodInfo {
+    pub fn new(meta: &MetaMethodDef, index: usize, method_impl: MethodImpl, signature: MethodDefSig) -> MethodInfo {
         MethodInfo {
             name: meta.name.clone(),
             rva: meta.rva as usize,
+            signature,
             meta_index: index,
             instruction: RefCell::new(method_impl),
         }
@@ -202,6 +198,6 @@ impl MethodImpl {
     }
 }
 
-pub struct ParamInfo{
-    pub name:Rc<String>,
+pub struct ParamInfo {
+    pub name: Rc<String>,
 }
